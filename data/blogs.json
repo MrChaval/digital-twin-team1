@@ -1,0 +1,41 @@
+[
+  {
+    "id": 1,
+    "title": "Understanding SQL Injection Attacks",
+    "slug": "understanding-sql-injection",
+    "author": "Digital Twin Team 1",
+    "published_date": "2026-01-18T10:00:00Z",
+    "category": "security",
+    "tags": ["sql", "injection", "web-security", "defense"],
+    "excerpt": "A comprehensive guide to SQL injection attacks and how our Digital Twin detects and prevents them.",
+    "content": "SQL injection remains one of the most critical web vulnerabilities...",
+    "views": 234,
+    "is_published": true
+  },
+  {
+    "id": 2,
+    "title": "Securing AI Systems Against Prompt Injection",
+    "slug": "securing-ai-prompt-injection",
+    "author": "Digital Twin Team 1",
+    "published_date": "2026-01-20T14:30:00Z",
+    "category": "ai-security",
+    "tags": ["ai", "prompt-injection", "llm-security", "defense"],
+    "excerpt": "How we protect our AI chatbot from malicious prompt injection attempts.",
+    "content": "As AI becomes more integrated into applications, new attack vectors emerge...",
+    "views": 156,
+    "is_published": true
+  },
+  {
+    "id": 3,
+    "title": "Real-time Threat Detection Dashboard",
+    "slug": "realtime-threat-dashboard",
+    "author": "Digital Twin Team 1",
+    "published_date": "2026-01-21T09:00:00Z",
+    "category": "features",
+    "tags": ["dashboard", "monitoring", "analytics", "defense"],
+    "excerpt": "Building a live security dashboard that tracks and visualizes attack attempts.",
+    "content": "Our Digital Twin includes a real-time threat monitoring system...",
+    "views": 89,
+    "is_published": false
+  }
+]

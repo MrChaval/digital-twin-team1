@@ -1,0 +1,53 @@
+[
+  {
+    "id": 1,
+    "title": "Digital Twin Portfolio System",
+    "description": "A production-grade cybersecurity portfolio with active defense capabilities",
+    "category": "full-stack",
+    "technologies": ["Next.js", "React", "PostgreSQL", "Arcjet", "OpenAI", "MCP"],
+    "status": "in-progress",
+    "started_date": "2026-01-15",
+    "github_url": "https://github.com/MrChaval/digital-twin-team1",
+    "live_url": null,
+    "features": [
+      "AI-powered chatbot",
+      "Real-time attack detection",
+      "Threat analytics dashboard",
+      "Secure content management"
+    ]
+  },
+  {
+    "id": 2,
+    "title": "Ethical Hacking Challenge Zone",
+    "description": "Interactive security challenges inviting ethical hackers to test our defenses",
+    "category": "security",
+    "technologies": ["Node.js", "Express", "Redis", "WAF"],
+    "status": "planned",
+    "started_date": null,
+    "github_url": null,
+    "live_url": null,
+    "features": [
+      "SQL injection challenges",
+      "XSS prevention demos",
+      "Rate limiting tests",
+      "CAPTCHA bypass detection"
+    ]
+  },
+  {
+    "id": 3,
+    "title": "Security Analytics Engine",
+    "description": "ML-based system for analyzing and predicting attack patterns",
+    "category": "data-science",
+    "technologies": ["Python", "TensorFlow", "Pandas", "PostgreSQL"],
+    "status": "research",
+    "started_date": "2026-01-20",
+    "github_url": null,
+    "live_url": null,
+    "features": [
+      "Attack pattern recognition",
+      "Threat level scoring",
+      "Predictive analytics",
+      "Automated reporting"
+    ]
+  }
+]

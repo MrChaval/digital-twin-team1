@@ -1,0 +1,60 @@
+{
+  "app": {
+    "name": "Digital Twin Team 1",
+    "tagline": "Catch Me If You Can",
+    "version": "1.0.0",
+    "environment": "development"
+  },
+  "security": {
+    "enabled_defenses": [
+      "sql_injection_protection",
+      "xss_prevention",
+      "csrf_protection",
+      "rate_limiting",
+      "bot_detection",
+      "prompt_injection_guards"
+    ],
+    "threat_levels": {
+      "low": {
+        "color": "#00ff00",
+        "threshold": 0
+      },
+      "medium": {
+        "color": "#ffaa00",
+        "threshold": 5
+      },
+      "high": {
+        "color": "#ff0000",
+        "threshold": 20
+      },
+      "critical": {
+        "color": "#aa0000",
+        "threshold": 50
+      }
+    },
+    "auto_block_threshold": 10,
+    "log_retention_days": 90
+  },
+  "features": {
+    "chatbot_enabled": true,
+    "blog_system_enabled": true,
+    "project_showcase_enabled": true,
+    "analytics_dashboard_enabled": true,
+    "ethical_hacking_zone_enabled": false,
+    "ai_content_generation": true
+  },
+  "ui": {
+    "theme": "dark",
+    "primary_color": "#0070f3",
+    "accent_color": "#ff4081",
+    "show_attack_counter": true,
+    "show_threat_level": true,
+    "dashboard_refresh_interval": 5000
+  },
+  "api": {
+    "version": "v1",
+    "base_path": "/api",
+    "timeout": 30000,
+    "max_payload_size": "10mb"
+  }
+}
