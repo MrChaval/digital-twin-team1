@@ -4,25 +4,25 @@ A production-grade cybersecurity portfolio that **represents**, **defends**, and
 
 ## What We're Building
 
-This isn't just a portfolio website, it's a live security demonstration system.
+This isn't just a portfolio website — it's a live security demonstration system.
 
-** Interactive Professional Showcase**
+### Interactive Professional Showcase
 - AI-powered chatbot representing our team
 - Dynamic project and blog content via MCP tools
 - Real-time engagement with visitors and recruiters
 
-** Active Defense System**
+### Active Defense System
 - Detects and logs real attacks (SQL injection, prompt injection, bot traffic)
 - Real-time security dashboard showing live threats
 - Ethical hacking challenges with transparent defense layers
 
-** Threat Intelligence Platform**
+### Threat Intelligence Platform
 - Analytics on attack patterns and frequency
 - Live threat indicators and severity scoring
 - System improvements based on actual attack data
 
-** Secured Agentic AI**
-- AI with content write permissions—our biggest security challenge
+### Secured Agentic AI
+- AI with content write permissions, our biggest security challenge
 - Protection against prompt injection and data poisoning
 - Enterprise-grade AI security patterns
 
@@ -38,4 +38,4 @@ This is hands-on cybersecurity that launches careers.
 
 ---
 
-**Team 1** - Building resilient, intelligent, defensible systems. 
+**Team 1** - Building resilient, intelligent, defensible systems.
