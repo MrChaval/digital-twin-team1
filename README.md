@@ -40,11 +40,11 @@ This is hands-on cybersecurity that launches careers.
 
 **Team 1** - Building resilient, intelligent, defensible systems.
 
-## Team Memebers
-Chaval Poolitthinan         chaval.jai@gmail.com
-Sonnam Phuntsho             sonamphuntsho1394@gmail.com
-Samuel Christoferi          sam9ace@gmail.com
-Tanveen Arnob               tanveenalpharnob@gmail.com
-Brix Clarence Digap         digapbrix@gmail.com
-NIKHIL GAUTAM               grenickofficial@gmail.com
+## All Team Members
+Chaval Poolitthinan
+Sonnam Phuntsho
+Samuel Christoferi
+Tanveen Arnob
+Brix Clarence Digap
+NIKHIL GAUTAM
 
