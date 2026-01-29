@@ -10,8 +10,8 @@ console.log("Loading database configuration...")
  */
 function parseDatabaseUrl(url: string) {
   try {
-    // Format: postgres://user:password@host:port/database
-    const regex = /postgres:\/\/([^:]+):([^@]+)@([^:]+):?(\d*)\/([^?]+)(\?.*)?/;
+    // Format: postgres://user:password@host:port/database OR postgresql://user:password@host:port/database
+    const regex = /postgres(?:ql)?:\/\/([^:]+):([^@]+)@([^:]+):?(\d*)\/([^?]+)(\?.*)?/;
     const match = url.match(regex);
     
     if (!match) {
