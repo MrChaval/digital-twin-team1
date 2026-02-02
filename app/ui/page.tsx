@@ -1,4 +1,7 @@
-"use client";
+'use client';
+
+// Isolate from root layout to avoid auth errors
+// Do NOT import anything from lib/, app/actions/, or components that use database
 
 import React, { useState, useEffect, useRef } from 'react';
 import { 

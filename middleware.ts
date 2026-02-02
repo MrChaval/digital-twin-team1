@@ -4,8 +4,14 @@ import { NextResponse } from "next/server";
 
 // Define protected routes that require authentication
 const isProtectedRoute = createRouteMatcher(['/admin','/resources(.*)', '/projects']);
+// Define public UI preview routes
+const isPublicUIRoute = createRouteMatcher(['/ui(.*)']);
 
 export default clerkMiddleware(async (auth, req) => {
+  // Skip auth for public UI routes
+  if (isPublicUIRoute(req)) {
+    return NextResponse.next();
+  }
   if (isProtectedRoute(req)) await auth.protect()
 })
 

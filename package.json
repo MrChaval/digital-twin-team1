@@ -69,6 +69,7 @@
     "drizzle-zod": "^0.7.1",
     "embla-carousel-react": "8.5.1",
     "expo-sqlite": "latest",
+    "framer-motion": "^12.29.3",
     "gel": "latest",
     "input-otp": "1.4.1",
     "knex": "latest",
