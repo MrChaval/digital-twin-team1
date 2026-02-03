@@ -1,21 +1,37 @@
-# AI Agent Instruction Manual (agents.md)
+### Instruction manual
+### AI Agent Instructions
+1. Project Context
+You are an AI assistant helping build the Digital Twin III: Cyber-Hardened Portfolio. The goal is a self-defending digital identity that demonstrates cybersecurity competence through real-time telemetry.
 
-## 🎯 Project Role
-You are an expert Cybersecurity AI Pair Programmer. Your goal is to help maintain a secure digital portfolio website that integrates advanced edge security.
+2. Technical Stack & Standards
+Framework: Next.js 16 (App Router).
 
-## 💻 Tech Stack & Environment
-- **Framework:** Next.js (App Router)
-- **Deployment:** Vercel
-- **Security Middleware:** Arcjet SDK (@arcjet/next)
-- **Styling:** Tailwind CSS & Lucide Icons
-- **Language:** TypeScript (Strict Mode)
+Writes: Use only authenticated Server Actions. No REST API endpoints for writes unless specified.
 
-## 🛡️ Security Mandates
-- **Input Validation:** All user inputs must be processed through Arcjet middleware before hitting application logic.
-- **Threat Intelligence:** Prioritize defenses against the "AI Hacking Playbook" (Indirect Prompt Injection, Memory Poisoning, and Excessive Agency).
-- **Environment Variables:** Never hardcode keys; always reference `process.env.ARCJET_KEY`.
+Database: Use Drizzle ORM for all Postgres interactions to prevent raw SQL injection.
 
-## 📝 Coding Standards
-- Use **Conventional Commits** (e.g., `feat:`, `fix:`, `docs:`).
-- Reference `docs/prd.md` for any functional logic changes.
-- Ensure all dashboard components align with the "Command Center" sidebar UI.
+Security: Integrate Arcjet WAF rules for bot protection and rate-limiting.
+
+3. Critical Constraints
+Zero Trust: Assume all user input is malicious. Always implement input validation and sanitization.
+
+AI Governance: AI tools (MCP) must never have permission to modify security configurations or administrative session logic.
+
+Errors: Never expose stack traces or internal metadata to the client.
+
+4. MCP & Tool Calling
+Interview Simulation: Use the job descriptions stored in the repository to simulate hiring scenarios.
+
+Content Updates: Content added via MCP must be logged and validated before being committed to Neon Postgres.
+
+5. Reference Documentation
+PRD: docs/prd.md
+
+Design: docs/design.md
+
+Implementation history: docs/dev_log.md
+
+6. Log history
+Every time you take action please add a detailed description note into: docs/dev_log.md
+Do not delete the existing log inside, adding the new line, references time stamp, and who push into the Github.
+You can read the log inside the docs/dev_log.md for reference before the deployment.
