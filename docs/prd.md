@@ -1,10 +1,34 @@
 # Product Requirements Document (PRD)
 ## Digital Twin Team 1 - "Catch Me If You Can"
 
-**Version:** 1.0  
-**Date:** January 30, 2026  
+**Version:** 2.0  
+**Date:** February 5, 2026  
 **Team:** Digital Twin Team 1  
-**Status:** Approved for Week 2
+**Status:** Updated for Week 3
+
+---
+
+## Reference Documentation
+
+### Project Documentation
+This PRD is part of a comprehensive documentation suite:
+
+- **Product Requirements (this document)**: `docs/prd.md` - Defines WHAT to build
+- **Technical Design**: `docs/design.md` - Defines HOW to build it  
+- **Implementation Plan**: `docs/implementation-plan.md` - Defines WHEN and WHO builds it
+- **Agent Instructions**: `agents.md` - AI tool configuration and MCP integration guide
+
+### AI Study Resources
+- **Next.js 15 Documentation**: https://nextjs.org/docs
+- **Clerk Authentication Guide**: https://clerk.com/docs
+- **Drizzle ORM Documentation**: https://orm.drizzle.team/docs
+- **Model Context Protocol (MCP)**: https://modelcontextprotocol.io/docs
+- **shadcn/ui Components**: https://ui.shadcn.com
+
+### Workshop Materials Referenced
+- Week 1-2: Requirements gathering, PRD creation, design documentation
+- Week 3: MCP server implementation, interview simulation tools
+- Security best practices: Zero-trust architecture, input validation, attack detection
 
 ---
 
@@ -74,20 +98,23 @@ This is hands-on cybersecurity that launches careers.
 - ✅ Blog system with dynamic posts from PostgreSQL
 - ✅ Projects showcase with admin CRUD capabilities
 - ✅ Newsletter subscription system
-- 🔄 AI chatbot integration (planned - MCP tools)
+- ✅ UI Preview Demo (`/ui` route) - Security dashboard mockup
+- 🔄 AI chatbot integration (planned - MCP tools with real data)
 
 **Key Features:**
 - Natural language interaction for portfolio navigation
 - Dynamic content generation from database
 - Real-time engagement tracking
 - Professional presentation layer
+- Interactive security dashboard preview
 
 #### Pillar 2: Active Defense System
 **Current Implementation:**
 - ✅ Attack log data structure (`data/attack-logs.json`)
 - ✅ Security monitoring foundation
-- 🔄 Real-time detection engine (planned)
-- 🔄 Security dashboard UI (planned)
+- ✅ UI Demo with mock attack visualization (`/ui` route)
+- 🔄 Real-time detection engine (in progress)
+- 🔄 Security dashboard with live data (planned)
 
 **Attack Types to Detect:**
 - SQL Injection attempts
@@ -310,15 +337,38 @@ attackLogs {
 - Recent attack activity feed
 - Accessible at `/admin/security` (admin-only)
 
-### 4.4 AI Chatbot (Planned)
+### 4.4 Security UI Preview (Implemented)
 
-#### FR-4.1: Chatbot Interface
+####  FR-4.1: Demo Dashboard Interface
+- Public preview route at `/ui` showcasing planned security features
+- Interactive navigation: Chatbot, Analytics, User Guide, About, Contact
+- Tab-based interface with smooth transitions
+- No authentication required (demo only)
+- Isolated from database (client-only mock data)
+
+#### FR-4.2: Mock Security Analytics
+- Display sample attack logs with severity indicators
+- Visual representation of attack types (SQL Injection, XSS, DDoS, etc.)
+- Time-based attack feed showing recent events
+- Color-coded severity levels (low/medium/high/critical)
+- Real-time animation effects for engagement
+
+#### FR-4.3: Chatbot Interface Preview
+- Chat UI with message input and send functionality
+- Mock conversation flow demonstrating chatbot capabilities
+- Visual design preview for final chatbot implementation
+- Typing indicators and smooth UX patterns
+- Message history display
+
+### 4.5 AI Chatbot with MCP Tools (Planned)
+
+#### FR-5.1: Chatbot Interface
 - Chat widget on homepage and key pages
 - Natural language interaction
 - Conversation history maintained during session
 - Typing indicators and smooth UX
 
-#### FR-4.2: MCP Tools Integration
+#### FR-5.2: MCP Tools Integration
 - Chatbot uses Model Context Protocol tools
 - Tools provide access to:
   - Portfolio content (projects, blog posts)
@@ -327,7 +377,7 @@ attackLogs {
   - Navigation assistance
 - Tool execution sandboxed and monitored
 
-#### FR-4.3: Prompt Injection Protection
+#### FR-5.3: Prompt Injection Protection
 - All user inputs sanitized before AI processing
 - System prompts hidden from users
 - Output validation to prevent data leakage
@@ -762,10 +812,10 @@ attackLogs {
 ## 11. Approval and Sign-off
 
 ### 11.1 Document Status
-**Version:** 1.0  
-**Status:** ✅ Approved for Implementation  
-**Approval Date:** January 30, 2026  
-**Next Review:** After Week 2 deliverables
+**Version:** 2.0  
+**Status:** ✅ Updated for Week 3  
+**Last Update:** February 5, 2026  
+**Next Review:** After Week 3 deliverables
 
 ### 11.2 Stakeholders
 - **Product Owner:** Digital Twin Team 1
@@ -776,21 +826,27 @@ attackLogs {
 ### 11.3 Change History
 | Version | Date | Changes | Author |
 |---------|------|---------|--------|
-| 1.0 | Jan 30, 2026 | Initial PRD created from README and codebase analysis | AI-assisted (Claude Opus 4.5) |
+| 1.0 | Jan 30, 2026 | Initial PRD created from README and codebase analysis | AI-assisted (Claude Sonnet 4.5) |
+| 2.0 | Feb 5, 2026 | Added reference documentation, updated implementation status with `/ui` demo route, reorganized functional requirements | AI-assisted (Claude Sonnet 4.5) |
 
 ### 11.4 Next Steps
-1. ✅ PRD approved → Proceed to design.md generation
-2. Generate technical design document from this PRD
-3. Create implementation plan with task breakdown
-4. Begin Week 3 development sprint
+1. ✅ PRD approved → Design document complete
+2. ✅ Technical design document generated
+3. ✅ Implementation plan created  
+4. ✅ UI preview demo implemented (`/ui` route)
+5. 🔄 Week 3: MCP server implementation for interview simulation
+6. 🔄 Week 3: Connect chatbot to real data via MCP tools
+7. 🔄 Week 4-5: Security features and attack detection
+8. 🔄 Week 6: Testing, optimization, and final polish
 
 ---
 
-**AI Attribution:** This PRD was generated using Claude Opus 4.5 based on the project README, current codebase analysis, and Week 2 requirements. It has been reviewed and approved by the Digital Twin Team 1.
+**AI Attribution:** This PRD was initially generated using Claude Sonnet 4.5 and updated to reflect current implementation status, new features (`/ui` demo route), and reference documentation requirements for Week 3.
 
 **Document Metadata:**
-- AI Model: Claude Opus 4.5
-- Generation Method: Analysis of README.md + codebase structure + Week 2 requirements
-- Human Review: Required before implementation
-- Last Updated: January 30, 2026
+- AI Model: Claude Sonnet 4.5
+- Generation Method: Analysis of README.md + codebase structure + current implementation
+- Human Review: Required before each sprint
+- Last Updated: February 5, 2026
+- Version: 2.0
 
