@@ -1,0 +1,64 @@
+{
+  "id": "job-003",
+  "title": "Senior Application Security Engineer",
+  "company": "CloudGuard Technologies",
+  "location": "Remote (US)",
+  "type": "Full-time",
+  "level": "Senior",
+  "description": "We're looking for a Senior Application Security Engineer to lead our application security initiatives. You will work with development teams to build security into the SDLC, conduct security assessments, and mentor junior security engineers.",
+  "responsibilities": [
+    "Lead security architecture reviews and threat modeling sessions",
+    "Conduct advanced penetration testing on web and mobile applications",
+    "Design and implement security automation tools and CI/CD security pipelines",
+    "Mentor junior security engineers and developers on secure coding practices",
+    "Perform security code reviews and static/dynamic analysis",
+    "Develop and maintain security testing frameworks",
+    "Collaborate with DevOps to implement DevSecOps practices",
+    "Stay ahead of emerging threats and attack techniques",
+    "Present security findings to technical and executive audiences"
+  ],
+  "requirements": [
+    "5+ years of experience in application security or similar role",
+    "Bachelor's or Master's degree in Computer Science, Cybersecurity, or related field",
+    "Deep understanding of web application vulnerabilities (SQL injection, XSS, CSRF, etc.)",
+    "Expert-level knowledge of at least two programming languages (JavaScript, Python, Java, Go)",
+    "Experience with security testing tools (Burp Suite, OWASP ZAP, Metasploit)",
+    "Strong understanding of modern web frameworks (React, Next.js, Angular, Node.js)",
+    "Experience with cloud platforms (AWS, Azure, GCP) and container security",
+    "Industry certifications such as OSCP, GWAPT, or CSSLP",
+    "Proven track record of identifying and remediating critical vulnerabilities"
+  ],
+  "skills": [
+    "Application Security",
+    "Penetration Testing",
+    "Threat Modeling",
+    "Secure Code Review",
+    "OWASP Top 10",
+    "API Security",
+    "DevSecOps",
+    "Security Automation",
+    "Cryptography",
+    "Authentication & Authorization (OAuth, JWT, SAML)",
+    "CI/CD Security Integration",
+    "Python, JavaScript, TypeScript",
+    "Docker & Kubernetes Security"
+  ],
+  "salary": "$130,000 - $180,000",
+  "posted": "2026-01-28",
+  "expires": "2026-03-10",
+  "benefits": [
+    "Unlimited PTO",
+    "Stock options",
+    "Conference and training budget ($5,000/year)",
+    "Home office stipend",
+    "Health, dental, vision insurance",
+    "Remote-first culture"
+  ],
+  "interviewProcess": [
+    "Phone screen with recruiter (30 min)",
+    "Technical interview with security team (1 hour)",
+    "Hands-on security assessment challenge (2-3 hours)",
+    "System design and architecture discussion (1 hour)",
+    "Final interview with engineering leadership (45 min)"
+  ]
+}
