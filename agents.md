@@ -21,6 +21,7 @@
 5. Reference Documentation
 - PRD: docs/prd.md
 - Design: docs/design.md
+- Implementation Plan: docs/implementation-plan.md
 - Implementation history: docs/dev_log.md
 
 6. Log history
