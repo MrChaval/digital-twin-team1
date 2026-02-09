@@ -566,3 +566,147 @@ Ready for Vercel redeployment - should now pass 1 MB Edge Function limit.
 - Same user experience
 - Faster cold starts (smaller bundle)
 - More cost-effective (less compute time)
+
+---
+
+## 2026-02-09 - Moved Arcjet Out of Middleware to Fix 1 MB Edge Function Limit
+**Timestamp:** 2026-02-09 18:20 UTC  
+**Modified by:** GitHub Copilot (AI Assistant)
+
+### Critical Issue:
+Vercel deployment still failed after minification:
+```
+Error: The Edge Function "middleware" size is 1.05 MB and your plan size limit is 1 MB
+```
+
+### Root Cause Analysis:
+The 1.05 MB is not the source code size (2.77 KB) but the **bundled output** including all dependencies:
+- `@clerk/nextjs/server` (~400-500 KB when bundled)
+- `@arcjet/next` with Shield, Bot Detection, Rate Limiting (~600-700 KB)
+- Combined: Exceeds 1 MB Edge Function limit
+
+### Solution Implemented:
+**Moved Arcjet protection OUT of middleware, kept only Clerk auth**
+
+#### New Architecture:
+
+**1. Minimal Middleware (middleware.ts)**
+- **Only includes**: Clerk authentication
+- **Size**: Minimal (~500-600 KB bundled)
+- **Purpose**: Handle auth routing only
+- **Files modified**: `middleware.ts`
+
+**2. Arcjet Protection API Route (app/api/protection/route.ts)**  
+- **Runtime**: Edge Function (separate from middleware)
+- **Contains**: All Arcjet rules (Shield, Bot Detection, Rate Limiting)
+- **Purpose**: Provides protection endpoint for routes that need it
+- **Can be called**: From Server Actions, API routes, or client-side
+
+**3. Arcjet Library (lib/arcjet.ts)**
+- **Exports**: Configured Arcjet instance
+- **Function**: `protectRoute()` - wrapper for easy protection
+- **Usage**: Import in any route/API handler that needs protection
+
+**4. Client Provider (components/arcjet-provider.tsx)**
+- **Purpose**: Optional client-side protection check
+- **Usage**: Wrap pages that need protection
+
+### Trade-offs:
+
+#### ✅ Pros:
+- **Middleware bundle**: Now under 1 MB (Clerk only)
+- **Deploys successfully**: Meets Vercel Free tier limit
+- **Flexible**: Apply Arcjet protection selectively
+- **Separation of concerns**: Auth vs Security layers separated
+
+#### ⚠️ Cons:
+- **Not global**: Arcjet protection no longer runs on EVERY request automatically
+- **Manual integration**: Must call protection API or import lib in routes
+- **Slightly different behavior**: Protection is opt-in per route instead of automatic
+
+### How to Use Arcjet Protection Now:
+
+#### Option 1: API Route Protection
+```typescript
+// In any API route
+import { protectRoute } from "@/lib/arcjet";
+import { NextRequest } from "next/server";
+
+export async function GET(req: NextRequest) {
+  const protection = await protectRoute(req);
+  
+  if (protection.isDenied) {
+    return Response.json({ error: "Blocked" }, { status: 403 });
+  }
+  
+  // Your route logic
+}
+```
+
+#### Option 2: Test Protection Endpoint
+```bash
+# Test rate limiting
+curl http://localhost:3000/api/protection
+# Refresh 16+ times to trigger rate limit
+```
+
+#### Option 3: Server Action Protection
+```typescript
+import { aj } from "@/lib/arcjet";
+
+export async function myAction(req: NextRequest) {
+  const decision = await aj.protect(req, { requested: 1 });
+  if (decision.isDenied) throw new Error("Blocked");
+  // Action logic
+}
+```
+
+### Alternative Solutions:
+
+#### 1. Vercel Pro Plan (Recommended)
+- **Edge Function Limit**: 2 MB (instead of 1 MB)
+- **Cost**: $20/month
+- **Benefit**: Keep Arcjet in middleware, global protection
+- **Link**: https://vercel.com/pricing
+
+#### 2. Vercel Native Features (Free Alternative)
+- **Rate Limiting**: Vercel Edge Config or KV
+- **Bot Protection**: Vercel Firewall (Pro plan)
+- **Trade-off**: Less sophisticated than Arcjet
+
+#### 3. Cloudflare Workers (Alternative Platform)
+- **Edge Function Limit**: 1 MB (same issue)
+- **Workers Paid Plan**: 10 MB limit
+- **Requires**: Migration from Vercel
+
+### Current State:
+- ✅ Middleware: Clerk auth only (under 1 MB)
+- ✅ Arcjet: Available via separate Edge Function
+- ✅ Build: Passes successfully
+- ⚠️ Protection: Must be manually integrated per route
+
+### Testing:
+```bash
+# Build succeeds
+pnpm run build
+
+# Test protection endpoint
+curl http://localhost:3000/api/protection
+
+# Test auth routes
+curl http://localhost:3000/admin  # Should require auth
+```
+
+### Recommendation:
+For production deployment with full Arcjet protection:
+1. **Upgrade to Vercel Pro** ($20/month) to get 2 MB Edge Function limit
+2. **Revert middleware.ts** to include Arcjet (previous version)  
+3. **Keep current implementation** as fallback for free tier
+
+Or accept the trade-off: Clerk auth in middleware, Arcjet protection on-demand per route.
+
+### Files Changed:
+- `middleware.ts` - Removed Arcjet, kept Clerk only
+- `lib/arcjet.ts` - NEW: Arcjet configuration
+- `app/api/protection/route.ts` - NEW: Protection endpoint
+- `components/arcjet-provider.tsx` - NEW: Client provider (optional)
