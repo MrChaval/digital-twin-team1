@@ -5,8 +5,8 @@ import { eq } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { ActionState, newsletterSubscriptionSchema } from "@/lib/types"
 
-// Define the interface but don't export it directly
-interface NewsletterState extends ActionState {
+// Export the interface so it can be used in components
+export interface NewsletterState extends ActionState {
   email?: string;
   name?: string;
 }
