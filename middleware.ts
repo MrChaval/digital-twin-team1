@@ -6,9 +6,11 @@ import arcjet, {
   tokenBucket 
 } from "@arcjet/next";
 
-// Initialize Arcjet with security rules
-const aj = arcjet({
-  key: process.env.ARCJET_KEY!,
+// Initialize Arcjet only if API key is available
+// This allows deployments to work without Arcjet configured
+const ARCJET_KEY = process.env.ARCJET_KEY || process.env.NEXT_PUBLIC_ARCJET_KEY;
+const aj = ARCJET_KEY ? arcjet({
+  key: ARCJET_KEY,
   // Shield against common attacks
   characteristics: ["ip.src"],
   rules: [
@@ -33,7 +35,7 @@ const aj = arcjet({
       capacity: 15, // Allow burst of 15 requests
     }),
   ],
-});
+}) : null;
 
 // Define protected routes that require authentication
 const isProtectedRoute = createRouteMatcher(['/admin', '/resources(.*)', '/projects']);
@@ -41,13 +43,14 @@ const isProtectedRoute = createRouteMatcher(['/admin', '/resources(.*)', '/proje
 const isPublicUIRoute = createRouteMatcher(['/ui(.*)']);
 
 export default clerkMiddleware(async (auth, req) => {
-  // Apply Arcjet security checks first
-  const decision = await aj.protect(req, {
-    requested: 1, // Request 1 token per request
-  });
+  // Apply Arcjet security checks only if configured
+  if (aj) {
+    const decision = await aj.protect(req, {
+      requested: 1, // Request 1 token per request
+    });
 
-  // Check if rate limited - return HTML error page
-  if (decision.isDenied() && decision.reason.isRateLimit()) {
+    // Check if rate limited - return HTML error page
+    if (decision.isDenied() && decision.reason.isRateLimit()) {
     return new NextResponse(
       `<!DOCTYPE html>
 <html lang="en">
@@ -200,6 +203,7 @@ export default clerkMiddleware(async (auth, req) => {
       { status: 403 }
     );
   }
+  } // End of Arcjet check
 
   // Skip auth for public UI routes
   if (isPublicUIRoute(req)) {
