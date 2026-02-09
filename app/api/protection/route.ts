@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { protectRoute } from "@/lib/arcjet";
 
-export const runtime = "edge";
+// Use Node.js runtime instead of Edge to avoid 1 MB bundle limit
+export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
   const protection = await protectRoute(req);

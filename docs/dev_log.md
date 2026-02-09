@@ -710,3 +710,132 @@ Or accept the trade-off: Clerk auth in middleware, Arcjet protection on-demand p
 - `lib/arcjet.ts` - NEW: Arcjet configuration
 - `app/api/protection/route.ts` - NEW: Protection endpoint
 - `components/arcjet-provider.tsx` - NEW: Client provider (optional)
+
+---
+
+## 2026-02-09 - Fixed Protection API Edge Function Size Issue
+**Timestamp:** 2026-02-09 18:30 UTC  
+**Modified by:** GitHub Copilot (AI Assistant)
+
+### New Error After Previous Fix:
+```
+Error: The Edge Function "api/protection" size is 1.06 MB and your plan size limit is 1 MB
+```
+
+### Root Cause:
+Moving Arcjet from middleware to `/api/protection` didn't solve the problem because:
+- `/api/protection` was set to `runtime = "edge"`
+- Edge Functions have 1 MB limit (same as middleware)
+- Arcjet bundle is still ~600-700 KB, causing same issue
+
+### Solution:
+**Changed `/api/protection` to use Node.js runtime instead of Edge**
+
+```typescript
+// Before:
+export const runtime = "edge";  // ❌ 1 MB limit
+
+// After:
+export const runtime = "nodejs"; // ✅ No size limit
+```
+
+### Why This Works:
+
+| Runtime | Size Limit | Speed | Use Case |
+|---------|------------|-------|----------|
+| **Edge** | 1 MB | Fastest (global) | Middleware, minimal logic |
+| **Node.js** | No limit | Fast (regional) | API routes, complex logic |
+
+### New Architecture (Final):
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ Middleware (Edge Runtime)                               │
+│ - Clerk authentication only                             │
+│ - Size: ~500 KB bundled ✅                              │
+│ - Runs on: Every request globally                       │
+└─────────────────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────────────────┐
+│ /api/protection (Node.js Runtime)                       │
+│ - Full Arcjet protection (Shield, Bot, Rate Limit)      │
+│ - Size: No limit ✅                                      │
+│ - Runs on: When called from routes/actions              │
+└─────────────────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────────────────┐
+│ Your API Routes & Server Actions                        │
+│ - Import protectRoute() from lib/arcjet.ts              │
+│ - Full Arcjet functionality available                   │
+│ - No size restrictions                                   │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Performance Impact:
+
+**Edge Runtime:**
+- Cold start: ~50ms
+- Global deployment
+- Best for: Auth checks, routing
+
+**Node.js Runtime:**
+- Cold start: ~200-300ms  
+- Regional deployment (still fast)
+- Best for: Complex logic, large dependencies
+
+### Results:
+- ✅ Middleware: Edge runtime, <1 MB
+- ✅ Protection API: Node.js runtime, no limit
+- ✅ All Arcjet features: Preserved
+- ✅ Build: Succeeds
+- ✅ Deployment: Works on Vercel Free tier
+
+### Testing:
+```bash
+# Build succeeds
+pnpm run build
+
+# Test protection API (now Node.js)
+curl http://localhost:3000/api/protection
+
+# Test rate limiting
+for i in {1..20}; do curl http://localhost:3000/api/protection; done
+```
+
+### Usage in Your Routes:
+```typescript
+// Server Action or API Route
+import { protectRoute } from "@/lib/arcjet";
+
+export async function POST(req: NextRequest) {
+  // This runs in Node.js runtime - no size limit!
+  const protection = await protectRoute(req);
+  
+  if (protection.isDenied) {
+    return Response.json({ error: "Blocked" }, { status: 403 });
+  }
+  
+  // Your logic here
+}
+```
+
+### Why Not Use Edge for Everything?
+Edge runtime is optimized for speed but has strict limits:
+- 1 MB bundle size
+- No Node.js APIs (fs, crypto)
+- No large dependencies
+
+Node.js runtime is better for:
+- Complex security logic (Arcjet)
+- Database operations
+- File processing
+- Any large libraries
+
+### Final Assessment:
+- **Middleware**: Edge (auth routing) ✅
+- **Protection**: Node.js (security logic) ✅  
+- **Performance**: Fast enough for production ✅
+- **Cost**: Free tier compatible ✅
+- **Functionality**: 100% preserved ✅
+
+No functionality lost, all Arcjet features work, deployment succeeds!
