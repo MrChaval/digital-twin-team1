@@ -16,13 +16,16 @@ const aj = arcjet({
     shield({
       mode: "LIVE", // Change to "DRY_RUN" for testing
     }),
-    // Detect and block automated bots
+    // Detect and block automated bots - STRICT MODE
     detectBot({
       mode: "LIVE",
       allow: [
         "CATEGORY:SEARCH_ENGINE", // Allow Google, Bing, DuckDuckGo, etc.
-        "CATEGORY:PREVIEW", // Allow link preview services
-        "CATEGORY:MONITOR", // Allow uptime monitors
+        // Removed CATEGORY:PREVIEW and CATEGORY:MONITOR for stricter filtering
+      ],
+      // Block all other automated requests including curl, wget, python-requests, etc.
+      block: [
+        "CATEGORY:AUTOMATED", // Block all automated tools
       ],
     }),
     // Global rate limiting - balanced for normal browsing with multiple assets per page
@@ -41,7 +44,51 @@ const isProtectedRoute = createRouteMatcher(['/admin', '/resources(.*)', '/proje
 const isPublicUIRoute = createRouteMatcher(['/ui(.*)']);
 
 export default clerkMiddleware(async (auth, req) => {
-  // Apply Arcjet security checks first
+  // Additional manual User-Agent check for common automation tools
+  const userAgent = req.headers.get("user-agent") || "";
+  const blockedUserAgents = [
+    "curl",
+    "wget",
+    "python-requests",
+    "python-urllib",
+    "java/",
+    "go-http-client",
+    "ruby",
+    "perl",
+    "php",
+    "scrapy",
+    "postman",
+    "insomnia",
+    "httpie",
+    "axios",
+    "node-fetch",
+    "fetch",
+    "bot",
+    "crawler",
+    "spider",
+    "scraper",
+  ];
+
+  // Block if user agent matches automation tools (case-insensitive)
+  const isAutomationTool = blockedUserAgents.some((blocked) =>
+    userAgent.toLowerCase().includes(blocked.toLowerCase())
+  );
+
+  // Allow only if it looks like a real browser or a verified search engine
+  const isLikelyBrowser = userAgent.includes("Mozilla") || userAgent.includes("Chrome") || userAgent.includes("Safari");
+  const isSearchEngine = userAgent.includes("Googlebot") || userAgent.includes("Bingbot") || userAgent.includes("DuckDuckBot");
+
+  if (isAutomationTool && !isSearchEngine) {
+    return NextResponse.json(
+      {
+        error: "Forbidden",
+        message: "Automated requests are not allowed",
+      },
+      { status: 403 }
+    );
+  }
+
+  // Apply Arcjet security checks
   const decision = await aj.protect(req, {
     requested: 1, // Request 1 token per request
   });
