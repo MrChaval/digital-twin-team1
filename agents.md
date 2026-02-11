@@ -29,3 +29,5 @@
 - Do not delete the existing log inside, adding the new line, references the time stamp, and who pushed into the Github.
 - You can read the log inside the docs/dev_log.md for reference before the deployment.
 - When pushing to Github create branch (You can create your own title that match current works), leaving the commit for user done.
+- During the time that push to Github, If there is the same branch already create earlier just commit into that branch.
+- User will delete branch when they are on longer used.
