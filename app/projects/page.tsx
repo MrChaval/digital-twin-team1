@@ -2,6 +2,7 @@ import { Shield, AlertTriangle, FileCode, Lock, Server, Users } from "lucide-rea
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import ClientProjectAdmin from "@/components/client-project-admin"
 import { getProjects } from "@/app/actions/projects"
+import { Project } from "@/lib/types"
 
 // Force dynamic rendering to avoid database access during build
 export const dynamic = 'force-dynamic';
@@ -18,7 +19,7 @@ const iconMap = {
 
 export default async function ProjectsPage() {
   // Fetch projects with error handling
-  let projects: any[] = [];
+  let projects: Project[] = [];
   let error: string | null = null;
   
   try {
