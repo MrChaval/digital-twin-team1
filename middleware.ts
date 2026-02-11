@@ -28,12 +28,12 @@ const aj = arcjet({
         "CATEGORY:AUTOMATED", // Block all automated tools
       ],
     }),
-    // Global rate limiting - balanced for normal browsing with multiple assets per page
+    // Global rate limiting - strict rate limit per IP
     tokenBucket({
       mode: "LIVE",
-      refillRate: 100, // 100 requests per 10 seconds (allows ~10 page refreshes with all assets)
+      refillRate: 10, // 10 requests per 10 seconds
       interval: 10, // 10 seconds
-      capacity: 100, // Allow burst of 100 requests
+      capacity: 10, // Allow burst of 10 requests
     }),
   ],
 });
@@ -44,48 +44,96 @@ const isProtectedRoute = createRouteMatcher(['/admin', '/resources(.*)', '/proje
 const isPublicUIRoute = createRouteMatcher(['/ui(.*)']);
 
 export default clerkMiddleware(async (auth, req) => {
-  // Additional manual User-Agent check for common automation tools
+  // STRICT User-Agent validation - Block all non-browser requests
   const userAgent = req.headers.get("user-agent") || "";
-  const blockedUserAgents = [
-    "curl",
-    "wget",
-    "python-requests",
-    "python-urllib",
-    "java/",
-    "go-http-client",
-    "ruby",
-    "perl",
-    "php",
-    "scrapy",
-    "postman",
-    "insomnia",
-    "httpie",
-    "axios",
-    "node-fetch",
-    "fetch",
-    "bot",
-    "crawler",
-    "spider",
-    "scraper",
+  
+  // List of verified search engines (case-insensitive)
+  const allowedSearchEngines = [
+    "googlebot",
+    "bingbot",
+    "duckduckbot",
+    "slurp", // Yahoo
+    "baiduspider", // Baidu
+    "yandexbot", // Yandex
   ];
-
-  // Block if user agent matches automation tools (case-insensitive)
-  const isAutomationTool = blockedUserAgents.some((blocked) =>
-    userAgent.toLowerCase().includes(blocked.toLowerCase())
+  
+  // Check if it's a verified search engine
+  const isSearchEngine = allowedSearchEngines.some((engine) =>
+    userAgent.toLowerCase().includes(engine)
   );
 
-  // Allow only if it looks like a real browser or a verified search engine
-  const isLikelyBrowser = userAgent.includes("Mozilla") || userAgent.includes("Chrome") || userAgent.includes("Safari");
-  const isSearchEngine = userAgent.includes("Googlebot") || userAgent.includes("Bingbot") || userAgent.includes("DuckDuckBot");
+  // If it's a search engine, allow it
+  if (!isSearchEngine) {
+    // Block if User-Agent is empty or missing
+    if (!userAgent || userAgent.trim() === "") {
+      return NextResponse.json(
+        {
+          error: "Forbidden",
+          message: "Missing User-Agent header",
+        },
+        { status: 403 }
+      );
+    }
 
-  if (isAutomationTool && !isSearchEngine) {
-    return NextResponse.json(
-      {
-        error: "Forbidden",
-        message: "Automated requests are not allowed",
-      },
-      { status: 403 }
+    // List of common automation tool signatures
+    const blockedUserAgents = [
+      "curl",
+      "wget",
+      "python-requests",
+      "python-urllib",
+      "java/",
+      "go-http-client",
+      "ruby",
+      "perl",
+      "php",
+      "scrapy",
+      "postman",
+      "insomnia",
+      "httpie",
+      "axios",
+      "node-fetch",
+      "apache-httpclient",
+      "okhttp",
+      "libwww",
+    ];
+
+    // Block if user agent matches automation tools (case-insensitive)
+    const isAutomationTool = blockedUserAgents.some((blocked) =>
+      userAgent.toLowerCase().includes(blocked.toLowerCase())
     );
+
+    if (isAutomationTool) {
+      return NextResponse.json(
+        {
+          error: "Forbidden",
+          message: "Automated requests are not allowed",
+        },
+        { status: 403 }
+      );
+    }
+
+    // Whitelist approach: Only allow User-Agents that look like real browsers
+    // Real browsers always include "Mozilla/" and one of the major browser indicators
+    const hasModernBrowserSignature = 
+      userAgent.includes("Mozilla/") && 
+      (
+        userAgent.includes("Chrome/") ||
+        userAgent.includes("Safari/") ||
+        userAgent.includes("Firefox/") ||
+        userAgent.includes("Edg/") || // Edge
+        userAgent.includes("OPR/") // Opera
+      );
+
+    // Block if it doesn't look like a real browser
+    if (!hasModernBrowserSignature) {
+      return NextResponse.json(
+        {
+          error: "Forbidden",
+          message: "Invalid User-Agent",
+        },
+        { status: 403 }
+      );
+    }
   }
 
   // Apply Arcjet security checks

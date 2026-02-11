@@ -666,3 +666,80 @@ export const dynamic = 'force-dynamic';
  -   E n v i r o n m e n t   v a r i a b l e s   c o n f i r m e d   s e t   f o r   P r e v i e w   d e p l o y m e n t s 
  -   N o   r e m a i n i n g   s t a t i c   g e n e r a t i o n   d a t a b a s e   i s s u e s   d e t e c t e d  
  
+---
+
+## 2026-02-11 - Strict Bot Detection and Rate Limit Adjustment
+**Timestamp:** 2026-02-11 UTC  
+**Modified by:** GitHub Copilot (AI Assistant) - Requested by JaiZz
+
+### Production Issues Identified:
+1. **curl still bypassing bot detection**
+   - Production site: https://digital-twin-team1-delta.vercel.app/
+   - Issue: curl and other automation tools not being blocked
+   - Impact: Site vulnerable to automated scraping
+
+2. **Rate limit too lenient**
+   - Current: 100 requests per 10 seconds
+   - Problem: Allows too many requests from single IP
+   - Risk: Potential for abuse and resource exhaustion
+
+### Solution Implemented:
+
+#### 1. Rate Limit Reduced (100 → 10 requests/10s)
+**File Modified**: middleware.ts
+
+**Changes:**
+- Rate limit: 100 → 10 requests per 10 seconds
+- Capacity: 100 → 10 burst requests
+- Rationale: 10 req/10s allows ~1 page load per second (adequate for normal browsing, strict enough to prevent scraping)
+
+#### 2. Strict User-Agent Validation Implemented
+**File Modified**: middleware.ts
+
+**Four-Layer Protection:**
+
+**Layer 1: Search Engine Whitelist**
+- Explicitly allow: Googlebot, Bingbot, DuckDuckBot, Yahoo Slurp, Baiduspider, Yandexbot
+- Search engines bypass all other checks (for SEO)
+
+**Layer 2: Empty User-Agent Block**
+- Blocks requests with no User-Agent header
+- Common for basic curl usage
+
+**Layer 3: Automation Tool Blacklist**
+- Blocks: curl, wget, python-requests, python-urllib, java/, go-http-client, ruby, perl, php, scrapy, postman, insomnia, httpie, axios, node-fetch, apache-httpclient, okhttp, libwww
+
+**Layer 4: Browser Signature Validation (Whitelist Approach)**
+- Only allows requests with Mozilla/ AND (Chrome/ OR Safari/ OR Firefox/ OR Edg/ OR OPR/)
+- curl typically sends "curl/7.68.0" (no Mozilla/, no browser identifiers) → BLOCKED
+- Even spoofed User-Agents must match ALL criteria
+
+### Security Architecture:
+Request Flow:
+1. Is it a search engine? → ALLOW (Googlebot, etc.)
+2. Has User-Agent header? → NO: BLOCK (403)
+3. Contains automation tool name? → YES: BLOCK (403)
+4. Looks like real browser? → NO: BLOCK (403)
+5. Pass all checks → Proceed to Arcjet protection (Shield, Bot detection, Rate limiting)
+
+### Expected Results After Deployment:
+- ✅ Real browsers: Full access (200 OK)
+- ✅ Search engines: Full access (200 OK, for SEO)
+- ❌ curl: BLOCKED (403 Invalid User-Agent)
+- ❌ wget: BLOCKED (403 Invalid User-Agent)
+- ❌ python-requests: BLOCKED (403 Automated requests not allowed)
+- ❌ postman: BLOCKED (403 Automated requests not allowed)
+
+### Deployment Status:
+- ⏳ Changes committed to fix-bot-detection-strict branch
+- ⏳ Ready for push to GitHub
+- ⏳ Vercel will auto-deploy after push
+- ⏳ User to review and merge when satisfied
+
+### Notes:
+- Zero Trust: Assume all requests are malicious until proven legitimate
+- Defense in depth: Multiple layers of validation
+- SEO maintained: Search engines still crawl for discoverability
+- User experience: Normal browsing unaffected
+- Security: Automated tools completely blocked
+- Rate limiting: Prevents both human and bot abuse (10 req/10s per IP)
