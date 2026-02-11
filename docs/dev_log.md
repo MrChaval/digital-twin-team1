@@ -743,3 +743,131 @@ Request Flow:
 - User experience: Normal browsing unaffected
 - Security: Automated tools completely blocked
 - Rate limiting: Prevents both human and bot abuse (10 req/10s per IP)
+
+---
+
+## 2026-02-11 - Rate Limit Fine-Tuning Based on User Testing
+**Timestamp:** 2026-02-11 UTC  
+**Modified by:** GitHub Copilot (AI Assistant) - Requested by JaiZz
+
+### Issue Identified:
+- **Problem**: Rate limit of 10 requests/10 seconds was too strict for normal browsing
+- **User Report**: Pressing F5 (refresh) only worked 2 times before hitting rate limit
+- **Root Cause**: Single page load generates multiple requests (HTML, CSS, JS, images, fonts)
+  - Average page load: 5-10 requests
+  - 10 request limit = only ~2 page refreshes possible
+
+### Solution Implemented:
+**File Modified**: middleware.ts
+
+**Rate Limit Adjustment**: 10 → 50 requests per 10 seconds
+
+**Rationale**:
+- 50 requests / 7 requests per page = ~7 page refreshes in 10 seconds
+- Allows normal user behavior (browsing, refreshing, navigating)
+- Still strict enough to prevent automated scraping and abuse
+- Better balance between security and user experience
+
+### Comparison of Rate Limits:
+| Setting | Requests/10s | Page Refreshes | Use Case |
+|---------|--------------|----------------|----------|
+| Previous | 100 | ~14-20 | Too lenient, vulnerable to abuse |
+| Initial Fix | 10 | ~2 | Too strict, blocked normal users |
+| **Current** | **50** | **~7-10** | **Balanced: Secure + Usable** |
+
+### Expected Behavior After Deployment:
+- ✅ Normal browsing: 7-10 page refreshes within 10 seconds
+- ✅ Multiple tabs/navigation: Smooth experience
+- ✅ Asset loading: All resources load without hitting limit
+- ❌ Rapid automated scraping: Still blocked
+- ❌ Abuse patterns: Rate limit kicks in after 50 requests
+
+### Deployment Status:
+- ✅ Code updated in middleware.ts
+- ⏳ Ready to commit and push to fix-bot-detection-strict branch
+- ⏳ Vercel will auto-deploy after push
+
+### Notes:
+- Real-world testing showed 10 req/10s was too aggressive
+- 50 req/10s maintains security while improving UX
+- Bot detection layers still active (User-Agent validation + Arcjet)
+- This fine-tuning based on actual user feedback
+
+---
+
+## 2026-02-11 - Allow Vercel Preview Bot and Social Media Crawlers
+**Timestamp:** 2026-02-11 UTC  
+**Modified by:** GitHub Copilot (AI Assistant) - Requested by JaiZz
+
+### Issue Identified:
+- **Problem**: Vercel deployment preview showing error instead of website screenshot
+- **Error Display**: JSON error "Forbidden, Invalid User-Agent" in deployment preview
+- **Root Cause**: Vercel's preview crawler was blocked by strict bot detection
+- **Impact**: Deployment page shows error JSON instead of nice website preview image
+
+### Solution Implemented:
+**File Modified**: middleware.ts
+
+**Added to Allowlist**:
+- Vercel preview bots (vercel, vercelbot)
+- Social media crawlers (for link previews):
+  - Twitter (twitterbot)
+  - Facebook (facebookexternalhit)
+  - LinkedIn (linkedinbot)
+  - Slack (slackbot)
+  - Discord (discordbot)
+  - WhatsApp
+  - Telegram (telegrambot)
+
+**Updated Allowlist**:
+`	ypescript
+const allowedBots = [
+  // Search Engines (SEO)
+  "googlebot", "bingbot", "duckduckbot", "slurp", "baiduspider", "yandexbot",
+  // Preview/Social Media Crawlers (Link previews)
+  "vercel", "vercelbot", "twitterbot", "facebookexternalhit", 
+  "linkedinbot", "slackbot", "discordbot", "whatsapp", "telegrambot"
+];
+`
+
+### Why This Matters:
+**Vercel Preview**:
+- Vercel generates screenshot previews of deployments
+- Preview shown in deployment dashboard
+- Makes it easy to verify visual changes before going live
+
+**Social Media Previews**:
+- When you share your portfolio link on Twitter/LinkedIn/Discord
+- These platforms fetch preview images and descriptions
+- Creates rich link previews with your site's image/title
+- Improves professional appearance when sharing portfolio
+
+### Security Status:
+✅ **Still Blocked**:
+- curl, wget, python-requests (automation tools)
+- Postman, Insomnia, httpie (API testing tools)
+- Any request without proper browser User-Agent
+
+✅ **Now Allowed**:
+- Real browsers (Chrome, Firefox, Safari, Edge)
+- Search engines (Google, Bing, etc.)
+- Vercel preview crawler
+- Social media link previews
+
+### Expected Results After Deployment:
+- ✅ Vercel deployment preview shows actual website screenshot (not error)
+- ✅ Share portfolio link on Twitter → Nice preview card
+- ✅ Share on LinkedIn → Professional preview with image
+- ✅ Share on Discord/Slack → Rich embed preview
+- ❌ curl commands still blocked (403 Forbidden)
+
+### Deployment Status:
+- ✅ Code updated in middleware.ts
+- ⏳ Ready to commit and push to fix-bot-detection-strict branch
+- ⏳ Vercel will regenerate preview after deployment
+
+### Notes:
+- Preview bots are legitimate and don't pose security risk
+- They only fetch pages, don't perform actions
+- Essential for good UX in deployment dashboards and social sharing
+- Security remains strong against actual automation/scraping tools
