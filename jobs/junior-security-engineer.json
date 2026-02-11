@@ -1,0 +1,47 @@
+{
+  "id": "job-002",
+  "title": "Junior Security Engineer",
+  "company": "SecureNet Systems",
+  "location": "Hybrid - San Francisco, CA",
+  "type": "Full-time",
+  "level": "Entry-Level",
+  "description": "Join our security team as a Junior Security Engineer. This is an excellent opportunity for recent graduates or early-career professionals passionate about cybersecurity. You'll work alongside senior engineers to protect our infrastructure and learn cutting-edge security practices.",
+  "responsibilities": [
+    "Assist in monitoring security systems and responding to alerts",
+    "Help maintain and update security documentation",
+    "Participate in security testing and code reviews",
+    "Support incident response activities under guidance",
+    "Learn and implement security best practices",
+    "Assist with security tool configuration and maintenance",
+    "Document security incidents and lessons learned"
+  ],
+  "requirements": [
+    "Bachelor's degree in Computer Science, IT, or related field (or equivalent experience)",
+    "0-2 years of experience in IT or cybersecurity",
+    "Basic understanding of networking concepts (TCP/IP, DNS, HTTP)",
+    "Familiarity with Linux/Windows operating systems",
+    "Knowledge of common security vulnerabilities (OWASP Top 10)",
+    "Strong problem-solving and analytical skills",
+    "Excellent communication and teamwork abilities"
+  ],
+  "skills": [
+    "Network Fundamentals",
+    "Basic Scripting (Python, Bash)",
+    "Security Concepts",
+    "Log Analysis",
+    "Linux/Windows Administration",
+    "Git Version Control",
+    "Willingness to Learn",
+    "Attention to Detail"
+  ],
+  "salary": "$55,000 - $75,000",
+  "posted": "2026-02-05",
+  "expires": "2026-03-20",
+  "benefits": [
+    "Security certification training budget",
+    "Mentorship program",
+    "Flexible work schedule",
+    "Health insurance",
+    "401(k) matching"
+  ]
+}

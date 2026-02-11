@@ -1,0 +1,6 @@
+# Exclude MCP server from Vercel deployments
+# MCP server is a standalone Node.js server, not part of the Next.js web app
+src/mcp-server/
+
+# Exclude job data files (used by MCP server only)
+jobs/
