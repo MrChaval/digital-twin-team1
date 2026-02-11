@@ -25,12 +25,12 @@ const aj = arcjet({
         "CATEGORY:MONITOR", // Allow uptime monitors
       ],
     }),
-    // Global rate limiting - adjusted for whole site
+    // Global rate limiting - balanced for normal browsing with multiple assets per page
     tokenBucket({
       mode: "LIVE",
-      refillRate: 15, // 15 requests per 10 seconds
+      refillRate: 100, // 100 requests per 10 seconds (allows ~10 page refreshes with all assets)
       interval: 10, // 10 seconds
-      capacity: 15, // Allow burst of 15 requests
+      capacity: 100, // Allow burst of 100 requests
     }),
   ],
 });
