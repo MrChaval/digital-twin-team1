@@ -17,10 +17,16 @@ const iconMap = {
 }
 
 export default async function ProjectsPage() {
-  // Fetch projects directly using the server action.
-  // Error handling can be added here if needed (e.g., display an error message)
-  // but the fallback logic is removed per the request.
-  const projects = await getProjects(); 
+  // Fetch projects with error handling
+  let projects: any[] = [];
+  let error: string | null = null;
+  
+  try {
+    projects = await getProjects();
+  } catch (e) {
+    console.error('Error fetching projects:', e);
+    error = 'Unable to load projects. Database may not be initialized.';
+  } 
 
   return (
     <div className="flex flex-col">
@@ -43,6 +49,16 @@ export default async function ProjectsPage() {
 
       <section className="w-full py-12 md:py-24 lg:py-32 bg-background">
         <div className="container px-4 md:px-6">
+          {error ? (
+            <div className="text-center py-12">
+              <p className="text-destructive text-lg mb-4">{error}</p>
+              <p className="text-muted-foreground">Please run database migrations or contact administrator.</p>
+            </div>
+          ) : projects.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground text-lg">No projects available yet.</p>
+            </div>
+          ) : (
           <div className="grid gap-10 md:grid-cols-2 lg:grid-cols-3">
             {/* Ensure projects is an array before mapping */}
             {Array.isArray(projects) && projects.map((project) => {
@@ -73,6 +89,7 @@ export default async function ProjectsPage() {
               )
             })}
           </div>
+          )}
         </div>
       </section>
     </div>

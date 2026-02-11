@@ -9,8 +9,16 @@ import { formatDate } from "@/lib/utils"; // Assuming formatDate is in utils
 export const dynamic = 'force-dynamic';
 
 export default async function BlogPage() {
-  // Use the imported BlogPost type
-  const posts: BlogPost[] = await db.select().from(blogPosts).orderBy(blogPosts.createdAt);
+  // Use the imported BlogPost type with error handling
+  let posts: BlogPost[] = [];
+  let error: string | null = null;
+  
+  try {
+    posts = await db.select().from(blogPosts).orderBy(blogPosts.createdAt);
+  } catch (e) {
+    console.error('Error fetching blog posts:', e);
+    error = 'Unable to load blog posts. Database may not be initialized.';
+  }
 
   return (
     <div className="flex flex-col">
@@ -32,6 +40,16 @@ export default async function BlogPage() {
 
       <section className="w-full py-12 md:py-24 lg:py-32 bg-background">
         <div className="container px-4 md:px-6">
+          {error ? (
+            <div className="text-center py-12">
+              <p className="text-destructive text-lg mb-4">{error}</p>
+              <p className="text-muted-foreground">Please run database migrations or contact administrator.</p>
+            </div>
+          ) : posts.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground text-lg">No blog posts available yet.</p>
+            </div>
+          ) : (
           <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
             {posts.map((post) => ( // Type is inferred correctly now
               <Card key={post.id} className="overflow-hidden">
@@ -58,6 +76,7 @@ export default async function BlogPage() {
               </Card>
             ))}
           </div>
+          )}
         </div>
       </section>
     </div>
