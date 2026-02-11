@@ -3,6 +3,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import ClientProjectAdmin from "@/components/client-project-admin"
 import { getProjects } from "@/app/actions/projects"
 
+// Force dynamic rendering to avoid database access during build
+export const dynamic = 'force-dynamic';
+
 // Map icon strings to Lucide components
 const iconMap = {
   AlertTriangle: AlertTriangle,
