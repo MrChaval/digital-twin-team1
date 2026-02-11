@@ -47,23 +47,34 @@ export default clerkMiddleware(async (auth, req) => {
   // STRICT User-Agent validation - Block all non-browser requests
   const userAgent = req.headers.get("user-agent") || "";
   
-  // List of verified search engines (case-insensitive)
-  const allowedSearchEngines = [
+  // List of verified search engines and preview services (case-insensitive)
+  const allowedBots = [
+    // Search Engines
     "googlebot",
     "bingbot",
     "duckduckbot",
     "slurp", // Yahoo
     "baiduspider", // Baidu
     "yandexbot", // Yandex
+    // Preview/Social Media Crawlers
+    "vercel",
+    "vercelbot",
+    "twitterbot",
+    "facebookexternalhit",
+    "linkedinbot",
+    "slackbot",
+    "discordbot",
+    "whatsapp",
+    "telegrambot",
   ];
   
-  // Check if it's a verified search engine
-  const isSearchEngine = allowedSearchEngines.some((engine) =>
-    userAgent.toLowerCase().includes(engine)
+  // Check if it's an allowed bot (search engine or preview service)
+  const isAllowedBot = allowedBots.some((bot) =>
+    userAgent.toLowerCase().includes(bot)
   );
 
-  // If it's a search engine, allow it
-  if (!isSearchEngine) {
+  // If it's an allowed bot, skip all User-Agent checks
+  if (!isAllowedBot) {
     // Block if User-Agent is empty or missing
     if (!userAgent || userAgent.trim() === "") {
       return NextResponse.json(

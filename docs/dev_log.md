@@ -792,3 +792,82 @@ Request Flow:
 - 50 req/10s maintains security while improving UX
 - Bot detection layers still active (User-Agent validation + Arcjet)
 - This fine-tuning based on actual user feedback
+
+---
+
+## 2026-02-11 - Allow Vercel Preview Bot and Social Media Crawlers
+**Timestamp:** 2026-02-11 UTC  
+**Modified by:** GitHub Copilot (AI Assistant) - Requested by JaiZz
+
+### Issue Identified:
+- **Problem**: Vercel deployment preview showing error instead of website screenshot
+- **Error Display**: JSON error "Forbidden, Invalid User-Agent" in deployment preview
+- **Root Cause**: Vercel's preview crawler was blocked by strict bot detection
+- **Impact**: Deployment page shows error JSON instead of nice website preview image
+
+### Solution Implemented:
+**File Modified**: middleware.ts
+
+**Added to Allowlist**:
+- Vercel preview bots (vercel, vercelbot)
+- Social media crawlers (for link previews):
+  - Twitter (twitterbot)
+  - Facebook (facebookexternalhit)
+  - LinkedIn (linkedinbot)
+  - Slack (slackbot)
+  - Discord (discordbot)
+  - WhatsApp
+  - Telegram (telegrambot)
+
+**Updated Allowlist**:
+`	ypescript
+const allowedBots = [
+  // Search Engines (SEO)
+  "googlebot", "bingbot", "duckduckbot", "slurp", "baiduspider", "yandexbot",
+  // Preview/Social Media Crawlers (Link previews)
+  "vercel", "vercelbot", "twitterbot", "facebookexternalhit", 
+  "linkedinbot", "slackbot", "discordbot", "whatsapp", "telegrambot"
+];
+`
+
+### Why This Matters:
+**Vercel Preview**:
+- Vercel generates screenshot previews of deployments
+- Preview shown in deployment dashboard
+- Makes it easy to verify visual changes before going live
+
+**Social Media Previews**:
+- When you share your portfolio link on Twitter/LinkedIn/Discord
+- These platforms fetch preview images and descriptions
+- Creates rich link previews with your site's image/title
+- Improves professional appearance when sharing portfolio
+
+### Security Status:
+✅ **Still Blocked**:
+- curl, wget, python-requests (automation tools)
+- Postman, Insomnia, httpie (API testing tools)
+- Any request without proper browser User-Agent
+
+✅ **Now Allowed**:
+- Real browsers (Chrome, Firefox, Safari, Edge)
+- Search engines (Google, Bing, etc.)
+- Vercel preview crawler
+- Social media link previews
+
+### Expected Results After Deployment:
+- ✅ Vercel deployment preview shows actual website screenshot (not error)
+- ✅ Share portfolio link on Twitter → Nice preview card
+- ✅ Share on LinkedIn → Professional preview with image
+- ✅ Share on Discord/Slack → Rich embed preview
+- ❌ curl commands still blocked (403 Forbidden)
+
+### Deployment Status:
+- ✅ Code updated in middleware.ts
+- ⏳ Ready to commit and push to fix-bot-detection-strict branch
+- ⏳ Vercel will regenerate preview after deployment
+
+### Notes:
+- Preview bots are legitimate and don't pose security risk
+- They only fetch pages, don't perform actions
+- Essential for good UX in deployment dashboards and social sharing
+- Security remains strong against actual automation/scraping tools
