@@ -567,3 +567,62 @@ pnpm run build
 - Branch name uses hyphens (git doesn't allow spaces in branch names)
 - All changes will be tracked in this branch before merging
 - Safe to test deployment without affecting main branch
+
+---
+
+## 2026-02-11 - Fixed Blog Pages Build Error for Vercel
+**Timestamp:** 2026-02-11 UTC  
+**Modified by:** GitHub Copilot (AI Assistant) - Requested by JaiZz
+
+### Issue Identified:
+- **Problem**: Vercel build failing with database connection error
+- **Error**: `Export encountered an error on /blog/page: /blog` 
+- **Root Cause**: Blog pages were trying to connect to database during build time (static generation)
+- **Impact**: Build process failed because DATABASE_URL not available during Vercel build phase
+
+### Solution Implemented:
+**Files Modified:**
+1. `app/blog/page.tsx`
+2. `app/blog/[slug]/page.tsx`
+
+**Changes Made:**
+- Added `export const dynamic = 'force-dynamic';` to both blog pages
+- This forces Next.js to render these pages at **request time** instead of **build time**
+- Database queries now execute when users visit the page, not during deployment build
+
+#### Technical Details:
+```typescript
+// Force dynamic rendering to avoid database access during build
+export const dynamic = 'force-dynamic';
+```
+
+### Why This Fix Works:
+1. **Build Time vs Request Time:**
+   - Before: Pages tried to fetch blog posts during `next build` (no DB access)
+   - After: Pages fetch blog posts when user requests the page (DB available)
+
+2. **Database Availability:**
+   - Build phase: Only has access to environment variables for building code
+   - Runtime phase: Has full access to DATABASE_URL for live queries
+
+3. **Next.js Static vs Dynamic:**
+   - Static pages are pre-rendered at build time (good for speed, bad for DB queries)
+   - Dynamic pages are rendered on-demand (perfect for database-driven content)
+
+### Deployment Status:
+- ✅ Code changes committed
+- ✅ Pushed to `new-vercel-deployment` branch
+- ⏳ Vercel will auto-deploy from GitHub push
+- ⏳ Build should now succeed
+
+### Next Steps:
+1. Monitor Vercel deployment dashboard for success
+2. Verify blog pages load correctly after deployment
+3. Run database migrations if needed
+4. Test all features on production
+
+### Notes:
+- This is a common Next.js deployment issue with server components
+- Dynamic rendering is appropriate for blog content that updates frequently
+- No impact on security or performance
+- Clerk configuration already set in Vercel environment variables
