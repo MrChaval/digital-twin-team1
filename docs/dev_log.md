@@ -743,3 +743,52 @@ Request Flow:
 - User experience: Normal browsing unaffected
 - Security: Automated tools completely blocked
 - Rate limiting: Prevents both human and bot abuse (10 req/10s per IP)
+
+---
+
+## 2026-02-11 - Rate Limit Fine-Tuning Based on User Testing
+**Timestamp:** 2026-02-11 UTC  
+**Modified by:** GitHub Copilot (AI Assistant) - Requested by JaiZz
+
+### Issue Identified:
+- **Problem**: Rate limit of 10 requests/10 seconds was too strict for normal browsing
+- **User Report**: Pressing F5 (refresh) only worked 2 times before hitting rate limit
+- **Root Cause**: Single page load generates multiple requests (HTML, CSS, JS, images, fonts)
+  - Average page load: 5-10 requests
+  - 10 request limit = only ~2 page refreshes possible
+
+### Solution Implemented:
+**File Modified**: middleware.ts
+
+**Rate Limit Adjustment**: 10 → 50 requests per 10 seconds
+
+**Rationale**:
+- 50 requests / 7 requests per page = ~7 page refreshes in 10 seconds
+- Allows normal user behavior (browsing, refreshing, navigating)
+- Still strict enough to prevent automated scraping and abuse
+- Better balance between security and user experience
+
+### Comparison of Rate Limits:
+| Setting | Requests/10s | Page Refreshes | Use Case |
+|---------|--------------|----------------|----------|
+| Previous | 100 | ~14-20 | Too lenient, vulnerable to abuse |
+| Initial Fix | 10 | ~2 | Too strict, blocked normal users |
+| **Current** | **50** | **~7-10** | **Balanced: Secure + Usable** |
+
+### Expected Behavior After Deployment:
+- ✅ Normal browsing: 7-10 page refreshes within 10 seconds
+- ✅ Multiple tabs/navigation: Smooth experience
+- ✅ Asset loading: All resources load without hitting limit
+- ❌ Rapid automated scraping: Still blocked
+- ❌ Abuse patterns: Rate limit kicks in after 50 requests
+
+### Deployment Status:
+- ✅ Code updated in middleware.ts
+- ⏳ Ready to commit and push to fix-bot-detection-strict branch
+- ⏳ Vercel will auto-deploy after push
+
+### Notes:
+- Real-world testing showed 10 req/10s was too aggressive
+- 50 req/10s maintains security while improving UX
+- Bot detection layers still active (User-Agent validation + Arcjet)
+- This fine-tuning based on actual user feedback

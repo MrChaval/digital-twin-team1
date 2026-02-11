@@ -28,12 +28,12 @@ const aj = arcjet({
         "CATEGORY:AUTOMATED", // Block all automated tools
       ],
     }),
-    // Global rate limiting - strict rate limit per IP
+    // Global rate limiting - balanced rate limit per IP
     tokenBucket({
       mode: "LIVE",
-      refillRate: 10, // 10 requests per 10 seconds
+      refillRate: 50, // 50 requests per 10 seconds (allows ~7-10 page refreshes)
       interval: 10, // 10 seconds
-      capacity: 10, // Allow burst of 10 requests
+      capacity: 50, // Allow burst of 50 requests
     }),
   ],
 });
