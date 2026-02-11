@@ -9,6 +9,9 @@ import { formatDate } from "@/lib/utils"
 import { notFound } from "next/navigation"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
+// Force dynamic rendering to avoid database access during build
+export const dynamic = 'force-dynamic';
+
 async function getBlogPost(slug: string) {
   try {
     const post = await db.select().from(blogPosts).where(eq(blogPosts.slug, slug)).limit(1)

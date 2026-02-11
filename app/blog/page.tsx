@@ -5,6 +5,9 @@ import Image from "next/image";
 import { BlogPost } from "@/lib/types"; // Import BlogPost type from lib/types
 import { formatDate } from "@/lib/utils"; // Assuming formatDate is in utils
 
+// Force dynamic rendering to avoid database access during build
+export const dynamic = 'force-dynamic';
+
 export default async function BlogPage() {
   // Use the imported BlogPost type
   const posts: BlogPost[] = await db.select().from(blogPosts).orderBy(blogPosts.createdAt);
