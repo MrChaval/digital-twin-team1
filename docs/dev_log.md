@@ -871,3 +871,67 @@ const allowedBots = [
 - They only fetch pages, don't perform actions
 - Essential for good UX in deployment dashboards and social sharing
 - Security remains strong against actual automation/scraping tools
+
+---
+
+## 2026-02-11 - Fix Arcjet Bot Detection for Preview Services
+**Timestamp:** 2026-02-11 UTC  
+**Modified by:** GitHub Copilot (AI Assistant) - Requested by JaiZz
+
+### Issue Identified:
+- **Problem**: Vercel preview crawler still showing error despite being added to manual allowlist
+- **Error**: "Request blocked by security policy" still appearing in deployment preview
+- **Root Cause**: Arcjet's detectBot was blocking preview bots BEFORE manual User-Agent check
+- **Technical Detail**: Vercel bot passed manual check but got blocked by Arcjet's CATEGORY:AUTOMATED
+
+### Solution Implemented:
+**File Modified**: middleware.ts
+
+**Added to Arcjet's detectBot allowlist**:
+- CATEGORY:PREVIEW - Includes Vercel, social media crawlers, link preview services
+
+**Updated Arcjet Configuration**:
+`	ypescript
+detectBot({
+  mode: "LIVE",
+  allow: [
+    "CATEGORY:SEARCH_ENGINE",  // Google, Bing, etc.
+    "CATEGORY:PREVIEW",        // Vercel, Twitter, Facebook, LinkedIn preview bots
+  ],
+  block: [
+    "CATEGORY:AUTOMATED",      // curl, wget, scrapers
+  ],
+})
+`
+
+### Why Two Layers Needed:
+**Arcjet Bot Detection (AI-powered)**:
+- Uses machine learning to identify bot patterns
+- Categorizes bots: SEARCH_ENGINE, PREVIEW, AUTOMATED, etc.
+- Runs FIRST before our code
+
+**Manual User-Agent Check**:
+- Custom validation of User-Agent strings
+- Provides additional control and specificity
+- Runs AFTER Arcjet allows the request
+
+### Security Flow:
+1. Request arrives → Arcjet detectBot analyzes
+2. If CATEGORY:PREVIEW or SEARCH_ENGINE → ALLOW (pass to our code)
+3. If CATEGORY:AUTOMATED → BLOCK (403 Forbidden)
+4. Allowed requests → Manual User-Agent check
+5. Pass all checks → Arcjet Shield + Rate Limiting → Application
+
+### Expected Results After Deployment:
+- ✅ Vercel preview: Website screenshot (not error)
+- ✅ Twitter/LinkedIn share: Rich preview cards
+- ✅ Search engines: Full crawling access
+- ❌ curl: Still blocked (CATEGORY:AUTOMATED)
+- ❌ wget, python-requests: Blocked
+- ❌ Scrapers: Blocked
+
+### Notes:
+- CATEGORY:PREVIEW is Arcjet's built-in classification for legitimate preview bots
+- Includes Vercel, Twitter, Facebook, LinkedIn, Slack, Discord crawlers
+- Does not compromise security - these bots only fetch pages for previews
+- curl and automation tools remain blocked by CATEGORY:AUTOMATED
