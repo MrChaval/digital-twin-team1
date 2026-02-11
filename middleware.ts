@@ -16,12 +16,12 @@ const aj = arcjet({
     shield({
       mode: "LIVE", // Change to "DRY_RUN" for testing
     }),
-    // Detect and block automated bots - STRICT MODE
+    // Detect and block automated bots - Allow search engines and preview services
     detectBot({
       mode: "LIVE",
       allow: [
         "CATEGORY:SEARCH_ENGINE", // Allow Google, Bing, DuckDuckGo, etc.
-        // Removed CATEGORY:PREVIEW and CATEGORY:MONITOR for stricter filtering
+        "CATEGORY:PREVIEW", // Allow Vercel, social media preview bots
       ],
       // Block all other automated requests including curl, wget, python-requests, etc.
       block: [
