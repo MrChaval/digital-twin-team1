@@ -28,3 +28,4 @@
 - Every time you take action, add a detailed description note to: docs/dev_log.md
 - Do not delete the existing log inside, adding the new line, references the time stamp, and who pushed into the Github.
 - You can read the log inside the docs/dev_log.md for reference before the deployment.
+- When pushing to Github create branch (You can create your own title that match current works), leaving the commit for user done.

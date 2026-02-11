@@ -16,21 +16,24 @@ const aj = arcjet({
     shield({
       mode: "LIVE", // Change to "DRY_RUN" for testing
     }),
-    // Detect and block automated bots
+    // Detect and block automated bots - STRICT MODE
     detectBot({
       mode: "LIVE",
       allow: [
         "CATEGORY:SEARCH_ENGINE", // Allow Google, Bing, DuckDuckGo, etc.
-        "CATEGORY:PREVIEW", // Allow link preview services
-        "CATEGORY:MONITOR", // Allow uptime monitors
+        // Removed CATEGORY:PREVIEW and CATEGORY:MONITOR for stricter filtering
+      ],
+      // Block all other automated requests including curl, wget, python-requests, etc.
+      block: [
+        "CATEGORY:AUTOMATED", // Block all automated tools
       ],
     }),
-    // Global rate limiting - adjusted for whole site
+    // Global rate limiting - strict rate limit per IP
     tokenBucket({
       mode: "LIVE",
-      refillRate: 15, // 15 requests per 10 seconds
+      refillRate: 10, // 10 requests per 10 seconds
       interval: 10, // 10 seconds
-      capacity: 15, // Allow burst of 15 requests
+      capacity: 10, // Allow burst of 10 requests
     }),
   ],
 });
@@ -41,7 +44,99 @@ const isProtectedRoute = createRouteMatcher(['/admin', '/resources(.*)', '/proje
 const isPublicUIRoute = createRouteMatcher(['/ui(.*)']);
 
 export default clerkMiddleware(async (auth, req) => {
-  // Apply Arcjet security checks first
+  // STRICT User-Agent validation - Block all non-browser requests
+  const userAgent = req.headers.get("user-agent") || "";
+  
+  // List of verified search engines (case-insensitive)
+  const allowedSearchEngines = [
+    "googlebot",
+    "bingbot",
+    "duckduckbot",
+    "slurp", // Yahoo
+    "baiduspider", // Baidu
+    "yandexbot", // Yandex
+  ];
+  
+  // Check if it's a verified search engine
+  const isSearchEngine = allowedSearchEngines.some((engine) =>
+    userAgent.toLowerCase().includes(engine)
+  );
+
+  // If it's a search engine, allow it
+  if (!isSearchEngine) {
+    // Block if User-Agent is empty or missing
+    if (!userAgent || userAgent.trim() === "") {
+      return NextResponse.json(
+        {
+          error: "Forbidden",
+          message: "Missing User-Agent header",
+        },
+        { status: 403 }
+      );
+    }
+
+    // List of common automation tool signatures
+    const blockedUserAgents = [
+      "curl",
+      "wget",
+      "python-requests",
+      "python-urllib",
+      "java/",
+      "go-http-client",
+      "ruby",
+      "perl",
+      "php",
+      "scrapy",
+      "postman",
+      "insomnia",
+      "httpie",
+      "axios",
+      "node-fetch",
+      "apache-httpclient",
+      "okhttp",
+      "libwww",
+    ];
+
+    // Block if user agent matches automation tools (case-insensitive)
+    const isAutomationTool = blockedUserAgents.some((blocked) =>
+      userAgent.toLowerCase().includes(blocked.toLowerCase())
+    );
+
+    if (isAutomationTool) {
+      return NextResponse.json(
+        {
+          error: "Forbidden",
+          message: "Automated requests are not allowed",
+        },
+        { status: 403 }
+      );
+    }
+
+    // Whitelist approach: Only allow User-Agents that look like real browsers
+    // Real browsers always include "Mozilla/" and one of the major browser indicators
+    const hasModernBrowserSignature = 
+      userAgent.includes("Mozilla/") && 
+      (
+        userAgent.includes("Chrome/") ||
+        userAgent.includes("Safari/") ||
+        userAgent.includes("Firefox/") ||
+        userAgent.includes("Edg/") || // Edge
+        userAgent.includes("OPR/") // Opera
+      );
+
+    // Block if it doesn't look like a real browser
+    if (!hasModernBrowserSignature) {
+      return NextResponse.json(
+        {
+          error: "Forbidden",
+          message: "Invalid User-Agent",
+        },
+        { status: 403 }
+      );
+    }
+  }
+
+  // Apply Arcjet security checks
   const decision = await aj.protect(req, {
     requested: 1, // Request 1 token per request
   });
