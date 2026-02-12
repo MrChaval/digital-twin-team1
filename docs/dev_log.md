@@ -935,3 +935,54 @@ detectBot({
 - Includes Vercel, Twitter, Facebook, LinkedIn, Slack, Discord crawlers
 - Does not compromise security - these bots only fetch pages for previews
 - curl and automation tools remain blocked by CATEGORY:AUTOMATED
+
+---
+
+## 2026-02-12 - Main Branch Rollback - Remove Problematic Shadcn Commit
+**Timestamp:** 2026-02-12 UTC  
+**Modified by:** GitHub Copilot (AI Assistant) - Requested by JaiZz
+
+### Issue Identified:
+- **Problem**: Commit 47b6a31 "feat: install shadcn and hide chatbot" causing Vercel deployment errors
+- **Committed by**: chfer-sys (colleague)
+- **Impact**: Production deployment failing on Vercel
+- **Branch Affected**: main
+
+### Rollback Performed:
+- **Action**: Git hard reset of main branch to commit `5ef644c4f0679b3f15d06708668707d379f2547f`
+- **Commit Name**: "Merge pull request #25 from MrChaval/fix-bot-detection-strict"
+- **Branch**: main
+- **Method**: `git reset --hard 5ef644c` + `git push origin main --force`
+
+### Commands Executed:
+```powershell
+git checkout main
+git pull origin main
+git reset --hard 5ef644c4f0679b3f15d06708668707d379f2547f
+git push origin main --force
+```
+
+### Impact:
+- ? Main branch rolled back successfully
+- ? Remote GitHub main branch updated via force push
+- ? HEAD now points to commit 5ef644c (Merge PR #25)
+- ? Problematic shadcn commit (47b6a31) removed
+- ?? Vercel should automatically redeploy from updated main branch
+
+### Repository Status After Rollback:
+- Current commit: 5ef644c - "Merge pull request #25 from MrChaval/fix-bot-detection-strict"
+- Branch: main
+- Sync status: Local and remote in sync
+- Previous problematic commit: 47b6a31 (removed)
+
+### Next Steps:
+1. Monitor Vercel for automatic deployment trigger
+2. Verify deployment succeeds without errors
+3. Notify colleague (chfer-sys) about the rollback
+4. Review shadcn installation before re-attempting
+
+### Notes:
+- Force push used to rewrite main branch history
+- Colleague's work on shadcn needs to be reviewed before merging again
+- This ensures production stability while issue is investigated
+- All team members should pull latest main branch changes
