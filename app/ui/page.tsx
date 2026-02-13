@@ -280,10 +280,12 @@ const Dashboard = () => {
   ], [highSeverity, medSeverity, lowSeverity]);
 
   const geoPoints = useMemo(() => {
-    return logs.filter(l => l.latitude && l.longitude).map(l => ({
-      ...l,
-      pos: geoToXY(parseFloat(l.latitude!), parseFloat(l.longitude!)),
-    }));
+    return logs
+      .filter(l => l.latitude && l.longitude && !(parseFloat(l.latitude!) === 0 && parseFloat(l.longitude!) === 0))
+      .map(l => ({
+        ...l,
+        pos: geoToXY(parseFloat(l.latitude!), parseFloat(l.longitude!)),
+      }));
   }, [logs]);
 
   const activeAlerts = useMemo(() => {

@@ -1,5 +1,52 @@
 # Development Log
 
+## 2026-02-14 - Geo-Location Pipeline Fix: Global Threat Map Now Fully Functional
+**Timestamp:** 2026-02-14 ~UTC  
+**Modified by:** GitHub Copilot (AI Assistant)  
+**Branch:** sam-part-2
+
+### Problem Identified:
+- Queried Neon DB directly: **46 total records, only 3 had real geo coordinates** (Bangkok, Manila)
+- 19 records had corrupted `ip = '[object Object]'` — bad serialization from earlier logging
+- 9 records had `lat=0, lon=0` (null island) — false map plots in the Atlantic Ocean
+- `lib/ai-attack-logger.ts` — All 4 logging functions hardcoded `latitude: null, longitude: null` (no geo-lookup at all)
+- `middleware.ts` — Used deprecated `freegeoip.app` API for geo-lookup (returns errors, causing NULL geo data)
+- `app/actions/security.ts` — Properly implemented (ipapi.co + ip-api.com fallback), but only handles client-side events
+
+### Changes Made:
+1. **Added `resolveGeoLocation()` helper to `lib/ai-attack-logger.ts`**
+   - Dual-API chain: ipapi.co (primary, HTTPS) → ip-api.com (fallback, HTTP)
+   - 3-second timeout per API call
+   - Skips non-routable IPs (::1, 127.0.0.1, 192.168.x, etc.)
+   - Updated all 4 logging functions: `logPromptInjection`, `logOutputLeakage`, `logMCPToolDenied`, `logAISecurityEvent`
+
+2. **Replaced deprecated `freegeoip.app` in `middleware.ts`**
+   - Rate-limit logging (line ~157): replaced with ipapi.co → ip-api.com fallback chain
+   - General denial logging (line ~330): same dual-API approach
+   - Both paths now have proper 3s timeouts and graceful fallback
+
+3. **Filtered null-island coordinates in Dashboard**
+   - `app/ui/page.tsx` `geoPoints` filter: now excludes records where `lat=0 AND lon=0`
+   - Prevents false attack dots appearing at 0°N/0°E in the Atlantic Ocean
+
+4. **Database cleanup**
+   - Deleted 19 corrupted records with `ip = '[object Object]'`
+   - Cleared 9 null-island (0,0) coordinate records → set to NULL
+   - Backfilled 2 records with real IP `184.22.105.119` → resolved to Bangkok, Thailand
+   - **Final state:** 27 records total, 5 with verified geo data
+
+### Files Modified:
+- `lib/ai-attack-logger.ts` — Added resolveGeoLocation(), updated all loggers
+- `middleware.ts` — Replaced freegeoip.app with ipapi.co/ip-api.com in 2 locations
+- `app/ui/page.tsx` — Added null-island filter to geoPoints
+
+### Verification:
+- `npx next build` — ✅ All 16 routes pass
+- Direct DB query confirms 5 records now have verified geo coordinates
+- New attacks from real IPs will automatically resolve to coordinates going forward
+
+---
+
 ## 2026-02-14 - Analytics Dashboard: Fully Functional Upgrade
 **Timestamp:** 2026-02-14 ~UTC  
 **Modified by:** GitHub Copilot (AI Assistant)  

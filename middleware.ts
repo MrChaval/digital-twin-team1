@@ -154,17 +154,30 @@ export default clerkMiddleware(async (auth, req) => {
     // Log rate limit violation to database (don't await - fire and forget)
     (async () => {
       try {
-        const geoResponse = await fetch(`https://freegeoip.app/json/${decision.ip.toString()}`);
-        const geoData = await geoResponse.json();
-        
+        // Geo-lookup with fallback chain (ipapi.co → ip-api.com)
+        let geoCity: string | null = null;
+        let geoCountry: string | null = null;
+        let geoLat: string | null = null;
+        let geoLon: string | null = null;
+        const attackIp = decision.ip.toString();
+        try {
+          const r1 = await fetch(`https://ipapi.co/${attackIp}/json/`, { signal: AbortSignal.timeout(3000) });
+          if (r1.ok) { const d = await r1.json(); if (d.latitude && d.longitude) { geoCity = d.city; geoCountry = d.country_name; geoLat = String(d.latitude); geoLon = String(d.longitude); } }
+        } catch {
+          try {
+            const r2 = await fetch(`http://ip-api.com/json/${attackIp}`, { signal: AbortSignal.timeout(3000) });
+            if (r2.ok) { const d = await r2.json(); if (d.status === 'success') { geoCity = d.city; geoCountry = d.country; geoLat = String(d.lat); geoLon = String(d.lon); } }
+          } catch { /* geo unavailable */ }
+        }
+
         await db.insert(attackLogs).values({
-          ip: decision.ip.toString(),
+          ip: attackIp,
           severity: 6, // Rate limit severity
           type: "RATE_LIMIT",
-          city: geoData.city,
-          country: geoData.country_name,
-          latitude: geoData.latitude?.toString(),
-          longitude: geoData.longitude?.toString(),
+          city: geoCity,
+          country: geoCountry,
+          latitude: geoLat,
+          longitude: geoLon,
         });
       } catch (err) {
         console.error("Failed to log rate limit attack:", err);
@@ -326,19 +339,31 @@ export default clerkMiddleware(async (auth, req) => {
           severity = 8; // High severity for XSS
         }
         
-        // Fetch geolocation data
-        const geoResponse = await fetch(`https://freegeoip.app/json/${decision.ip.toString()}`);
-        const geoData = await geoResponse.json();
-        
+        // Geo-lookup with fallback chain (ipapi.co → ip-api.com)
+        let geoCity: string | null = null;
+        let geoCountry: string | null = null;
+        let geoLat: string | null = null;
+        let geoLon: string | null = null;
+        const blockIp = decision.ip.toString();
+        try {
+          const r1 = await fetch(`https://ipapi.co/${blockIp}/json/`, { signal: AbortSignal.timeout(3000) });
+          if (r1.ok) { const d = await r1.json(); if (d.latitude && d.longitude) { geoCity = d.city; geoCountry = d.country_name; geoLat = String(d.latitude); geoLon = String(d.longitude); } }
+        } catch {
+          try {
+            const r2 = await fetch(`http://ip-api.com/json/${blockIp}`, { signal: AbortSignal.timeout(3000) });
+            if (r2.ok) { const d = await r2.json(); if (d.status === 'success') { geoCity = d.city; geoCountry = d.country; geoLat = String(d.lat); geoLon = String(d.lon); } }
+          } catch { /* geo unavailable */ }
+        }
+
         // Log the attack to the database
         await db.insert(attackLogs).values({
-          ip: decision.ip.toString(),
+          ip: blockIp,
           severity,
           type,
-          city: geoData.city,
-          country: geoData.country_name,
-          latitude: geoData.latitude?.toString(),
-          longitude: geoData.longitude?.toString(),
+          city: geoCity,
+          country: geoCountry,
+          latitude: geoLat,
+          longitude: geoLon,
         });
       } catch (err) {
         console.error("Failed to log attack to database", err);
