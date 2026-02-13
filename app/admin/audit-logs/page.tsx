@@ -38,42 +38,57 @@ export default function AuditLogsPage() {
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
-  const [filters, setFilters] = useState({
-    action: "",
-    status: "",
-    userId: "",
-  });
+  const [actionFilter, setActionFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [userIdFilter, setUserIdFilter] = useState("");
 
   const limit = 20;
 
   const loadLogs = async () => {
     setLoading(true);
-    const result = await getAuditLogs({
-      limit,
-      offset: page * limit,
-      action: filters.action || undefined,
-      status: filters.status || undefined,
-      userId: filters.userId || undefined,
-    });
+    try {
+      const result = await getAuditLogs({
+        limit,
+        offset: page * limit,
+        action: actionFilter || undefined,
+        status: statusFilter || undefined,
+        userId: userIdFilter || undefined,
+      });
 
-    if (result.success && result.data) {
-      setLogs(result.data.logs as AuditLog[]);
-      setTotal(result.data.total);
+      if (result.success && result.data) {
+        setLogs(result.data.logs as AuditLog[]);
+        setTotal(result.data.total);
+      } else {
+        console.error("Failed to load logs:", result.error);
+        setLogs([]);
+        setTotal(0);
+      }
+    } catch (error) {
+      console.error("Error loading logs:", error);
+      setLogs([]);
+      setTotal(0);
     }
     setLoading(false);
   };
 
   const loadStats = async () => {
-    const result = await getAuditStats();
-    if (result.success && result.data) {
-      setStats(result.data as AuditStats);
+    try {
+      const result = await getAuditStats();
+      if (result.success && result.data) {
+        setStats(result.data as AuditStats);
+      } else {
+        console.error("Failed to load stats:", result.error);
+      }
+    } catch (error) {
+      console.error("Error loading stats:", error);
     }
   };
 
   useEffect(() => {
     loadLogs();
     loadStats();
-  }, [page, filters]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, actionFilter, statusFilter, userIdFilter]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -181,16 +196,16 @@ export default function AuditLogsPage() {
               <Input
                 id="action"
                 placeholder="e.g., PROJECT_CREATE"
-                value={filters.action}
-                onChange={(e) => setFilters({ ...filters, action: e.target.value })}
+                value={actionFilter}
+                onChange={(e) => setActionFilter(e.target.value)}
               />
             </div>
 
             <div>
               <Label htmlFor="status">Status</Label>
               <Select
-                value={filters.status}
-                onValueChange={(value) => setFilters({ ...filters, status: value })}
+                value={statusFilter}
+                onValueChange={(value) => setStatusFilter(value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="All statuses" />
@@ -209,8 +224,8 @@ export default function AuditLogsPage() {
               <Input
                 id="userId"
                 placeholder="user@example.com"
-                value={filters.userId}
-                onChange={(e) => setFilters({ ...filters, userId: e.target.value })}
+                value={userIdFilter}
+                onChange={(e) => setUserIdFilter(e.target.value)}
               />
             </div>
           </div>
@@ -224,7 +239,9 @@ export default function AuditLogsPage() {
             </Button>
             <Button
               onClick={() => {
-                setFilters({ action: "", status: "", userId: "" });
+                setActionFilter("");
+                setStatusFilter("");
+                setUserIdFilter("");
                 setPage(0);
               }}
               variant="ghost"

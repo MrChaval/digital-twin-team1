@@ -172,16 +172,21 @@ export default function SecurityTestPage() {
   };
 
   const runAllTests = async () => {
-    setTestResults([]);
-    await testAuditLog();
-    await new Promise(resolve => setTimeout(resolve, 500));
-    await testSessionValidation();
-    await new Promise(resolve => setTimeout(resolve, 500));
-    await testProjectCreation();
-    await new Promise(resolve => setTimeout(resolve, 500));
-    await testErrorSanitization();
-    await new Promise(resolve => setTimeout(resolve, 500));
-    await testFailedOperation();
+    try {
+      setTestResults([]);
+      await testAuditLog();
+      await new Promise(resolve => setTimeout(resolve, 500));
+      await testSessionValidation();
+      await new Promise(resolve => setTimeout(resolve, 500));
+      await testProjectCreation();
+      await new Promise(resolve => setTimeout(resolve, 500));
+      await testErrorSanitization();
+      await new Promise(resolve => setTimeout(resolve, 500));
+      await testFailedOperation();
+    } catch (error) {
+      console.error("Error running tests:", error);
+      addResult("Test Suite", "error", "An error occurred while running tests");
+    }
   };
 
   const getStatusIcon = (status: string) => {
