@@ -24,10 +24,6 @@ const aj = arcjet({
         "CATEGORY:SEARCH_ENGINE", // Allow Google, Bing, DuckDuckGo, etc.
         "CATEGORY:PREVIEW", // Allow Vercel, social media preview bots
       ],
-      // Block all other automated requests including curl, wget, python-requests, etc.
-      block: [
-        "CATEGORY:AUTOMATED", // Block all automated tools
-      ],
     }),
     // Global rate limiting - balanced rate limit per IP
     tokenBucket({
@@ -158,11 +154,11 @@ export default clerkMiddleware(async (auth, req) => {
     // Log rate limit violation to database (don't await - fire and forget)
     (async () => {
       try {
-        const geoResponse = await fetch(`https://freegeoip.app/json/${decision.ip.address}`);
+        const geoResponse = await fetch(`https://freegeoip.app/json/${decision.ip.toString()}`);
         const geoData = await geoResponse.json();
         
         await db.insert(attackLogs).values({
-          ip: decision.ip.address,
+          ip: decision.ip.toString(),
           severity: 6, // Rate limit severity
           type: "RATE_LIMIT",
           city: geoData.city,
@@ -331,12 +327,12 @@ export default clerkMiddleware(async (auth, req) => {
         }
         
         // Fetch geolocation data
-        const geoResponse = await fetch(`https://freegeoip.app/json/${decision.ip.address}`);
+        const geoResponse = await fetch(`https://freegeoip.app/json/${decision.ip.toString()}`);
         const geoData = await geoResponse.json();
         
         // Log the attack to the database
         await db.insert(attackLogs).values({
-          ip: decision.ip.address,
+          ip: decision.ip.toString(),
           severity,
           type,
           city: geoData.city,
@@ -354,7 +350,7 @@ export default clerkMiddleware(async (auth, req) => {
 
     console.warn("Arcjet blocked request:", {
       reason: decision.reason,
-      ip: decision.ip,
+      ip: decision.ip.toString(),
       path: req.nextUrl.pathname,
     });
     
