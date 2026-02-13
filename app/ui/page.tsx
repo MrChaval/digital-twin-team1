@@ -80,13 +80,50 @@ function timeAgo(dateStr: string): string {
   return `${days}d ago`;
 }
 
-// --- WORLD MAP SVG (simplified outline) ---
-const WORLD_MAP_PATH = "M 165 4 L 162 8 L 163 13 L 170 12 L 175 16 L 185 13 L 192 7 L 201 6 L 204 10 L 198 16 L 196 22 L 199 28 L 197 33 L 188 33 L 182 38 L 175 36 L 168 31 L 162 32 L 155 30 L 148 34 L 141 33 L 136 28 L 130 32 L 122 31 L 116 26 L 109 28 L 104 24 L 97 27 L 89 24 L 83 27 L 76 23 L 68 25 L 60 22 L 55 27 L 47 24 L 42 28 L 36 24 L 29 27 L 22 23 L 16 26 L 12 22 L 5 25 L 5 90 L 10 94 L 17 91 L 24 95 L 30 92 L 36 97 L 43 94 L 52 99 L 60 95 L 68 99 L 75 96 L 82 100 L 90 97 L 97 101 L 105 98 L 112 102 L 120 99 L 128 103 L 136 100 L 143 104 L 150 101 L 158 105 L 165 102 L 172 106 L 180 103 L 188 107 L 195 104 L 200 100 L 195 96 L 198 90 L 204 87 L 210 90 L 216 86 L 222 89 L 228 85 L 235 88 L 240 84 L 246 87 L 253 84 L 258 80 L 263 83 L 270 80 L 276 76 L 282 79 L 290 76 L 296 72 L 302 75 L 308 71 L 315 74 L 322 70 L 328 73 L 335 70 L 340 66 L 345 69 L 350 65 L 350 4 L 345 8 L 338 5 L 331 9 L 324 6 L 317 10 L 310 7 L 303 11 L 296 8 L 289 12 L 282 9 L 275 13 L 268 10 L 261 14 L 254 11 L 247 15 L 240 12 L 233 16 L 226 13 L 219 17 L 212 14 L 205 11 L 198 7 L 191 11 L 184 8 L 177 12 L 170 9 Z";
+// --- WORLD MAP SVG paths (equirectangular 1000×500, based on Natural Earth simplified outlines) ---
+const MAP_PATHS = {
+  // North America
+  northAmerica: "M130,55 L140,50 L155,48 L170,50 L185,45 L200,42 L215,45 L230,42 L240,48 L248,55 L255,60 L260,68 L258,78 L262,85 L268,90 L272,98 L265,105 L270,115 L275,120 L272,130 L268,138 L262,145 L255,148 L250,155 L242,160 L235,165 L228,170 L218,175 L210,172 L205,165 L195,168 L185,175 L178,180 L170,178 L162,185 L155,190 L148,192 L142,188 L138,195 L130,198 L122,195 L118,190 L110,188 L105,192 L98,188 L92,182 L88,175 L82,170 L78,162 L75,155 L70,148 L68,140 L65,132 L62,125 L58,118 L55,110 L50,102 L48,95 L45,88 L42,82 L40,75 L38,68 L42,62 L48,58 L55,55 L62,50 L70,48 L78,52 L85,55 L92,52 L100,50 L108,48 L115,50 L122,52 Z",
+  // Greenland
+  greenland: "M280,30 L295,28 L310,32 L318,38 L322,48 L318,58 L310,65 L300,68 L290,65 L282,58 L278,48 L275,40 Z",
+  // Central America
+  centralAmerica: "M155,190 L160,195 L165,200 L168,208 L172,215 L178,220 L182,225 L180,230 L175,232 L170,228 L165,225 L160,220 L155,215 L150,210 L148,205 L150,198 Z",
+  // South America
+  southAmerica: "M195,230 L205,225 L215,228 L225,232 L235,238 L242,245 L248,255 L252,265 L255,278 L258,290 L260,305 L258,318 L255,330 L250,342 L245,355 L238,365 L230,375 L222,382 L215,390 L208,395 L200,398 L195,395 L190,388 L185,378 L180,368 L178,355 L175,342 L172,330 L170,318 L168,305 L170,292 L172,280 L175,268 L178,258 L182,248 L188,238 Z",
+  // Europe
+  europe: "M470,55 L478,50 L488,48 L498,52 L508,48 L518,50 L525,55 L530,62 L535,58 L542,55 L548,60 L552,68 L548,75 L542,80 L535,85 L530,92 L525,98 L518,105 L510,110 L502,115 L495,118 L488,120 L480,122 L472,120 L465,115 L458,110 L452,105 L448,98 L445,92 L442,85 L445,78 L448,72 L452,65 L458,60 L465,58 Z",
+  // British Isles
+  britishIsles: "M440,60 L448,55 L455,58 L452,65 L448,70 L442,68 L438,65 Z",
+  // Scandinavia
+  scandinavia: "M488,22 L495,18 L505,20 L512,25 L518,32 L522,40 L520,48 L515,42 L508,38 L500,42 L495,48 L488,45 L482,38 L480,30 Z",
+  // Africa
+  africa: "M470,140 L480,135 L490,138 L500,135 L510,138 L520,142 L528,148 L535,158 L540,168 L542,180 L545,192 L548,205 L550,218 L548,232 L545,245 L540,258 L535,268 L528,278 L520,288 L512,295 L502,300 L492,302 L482,305 L472,302 L462,298 L455,290 L448,280 L442,268 L438,255 L435,242 L432,228 L430,215 L432,202 L435,190 L438,178 L442,168 L448,158 L455,150 L462,145 Z",
+  // Madagascar
+  madagascar: "M558,275 L565,270 L570,278 L568,288 L562,295 L555,290 L552,282 Z",
+  // Middle East
+  middleEast: "M535,105 L548,100 L558,105 L568,108 L575,115 L578,125 L575,135 L568,140 L558,142 L548,138 L540,132 L535,125 L530,118 L528,110 Z",
+  // Russia / Northern Asia
+  russia: "M525,22 L545,18 L565,20 L585,18 L605,15 L625,18 L645,15 L665,18 L685,20 L705,22 L725,18 L745,20 L762,22 L778,25 L790,30 L798,38 L802,48 L798,55 L790,60 L778,62 L765,58 L750,55 L735,58 L720,55 L705,58 L690,60 L675,58 L660,55 L645,58 L630,60 L615,58 L600,55 L585,58 L570,60 L558,58 L548,55 L540,50 L532,45 L525,38 L520,30 Z",
+  // Central/South Asia (India etc.)
+  southAsia: "M605,100 L618,95 L630,98 L642,102 L650,110 L655,120 L658,132 L660,145 L655,158 L648,168 L640,175 L630,178 L620,175 L612,168 L605,158 L600,148 L598,138 L595,128 L598,118 L600,108 Z",
+  // Southeast Asia
+  southeastAsia: "M668,155 L678,150 L690,152 L700,158 L708,165 L715,175 L718,185 L715,195 L708,200 L700,205 L690,202 L680,198 L672,190 L665,180 L662,170 L665,162 Z",
+  // China / East Asia
+  eastAsia: "M665,60 L680,55 L698,58 L715,55 L730,60 L742,68 L750,78 L755,88 L752,100 L748,110 L740,118 L730,125 L718,128 L705,130 L692,128 L680,122 L670,115 L662,105 L658,95 L655,85 L658,75 L662,68 Z",
+  // Japan
+  japan: "M772,72 L778,68 L785,72 L788,80 L785,90 L780,98 L775,105 L770,100 L768,92 L770,82 Z",
+  // Indonesia / Maritime SE Asia
+  indonesia: "M700,210 L715,205 L730,208 L745,212 L758,215 L770,218 L780,222 L772,228 L760,230 L748,228 L735,225 L722,222 L710,218 L702,215 Z",
+  // Australia
+  australia: "M735,290 L755,280 L775,278 L795,282 L812,288 L828,295 L838,305 L842,318 L838,332 L830,342 L818,350 L805,355 L790,358 L775,355 L760,350 L748,342 L738,332 L732,318 L730,305 L732,295 Z",
+  // New Zealand
+  newZealand: "M862,340 L868,335 L872,342 L870,352 L865,360 L858,355 L855,348 Z",
+};
 
-/** Convert lat/long to x/y on a 350×110 equirectangular projection */
+/** Convert lat/long to x/y on a 1000×500 equirectangular projection */
 function geoToXY(lat: number, lon: number): { x: number; y: number } {
-  const x = ((lon + 180) / 360) * 350;
-  const y = ((90 - lat) / 180) * 110;
+  const x = ((lon + 180) / 360) * 1000;
+  const y = ((90 - lat) / 180) * 500;
   return { x, y };
 }
 
@@ -479,28 +516,29 @@ const Dashboard = () => {
             <span className="flex items-center gap-2 text-xs text-slate-500"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Low</span>
           </div>
         </div>
-        <div className="relative w-full" style={{ paddingBottom: '31.4%' }}>
-          <svg viewBox="0 0 350 110" className="absolute inset-0 w-full h-full" xmlns="http://www.w3.org/2000/svg">
+        <div className="relative w-full" style={{ paddingBottom: '50%' }}>
+          <svg viewBox="0 0 1000 500" className="absolute inset-0 w-full h-full" xmlns="http://www.w3.org/2000/svg">
+            {/* Ocean background */}
+            <rect width="1000" height="500" fill="#0c1425" rx="8" />
             {/* Grid lines */}
-            {[...Array(7)].map((_, i) => (<line key={`h${i}`} x1={0} y1={i * 18.3} x2={350} y2={i * 18.3} stroke="#1e293b" strokeWidth="0.3" />))}
-            {[...Array(13)].map((_, i) => (<line key={`v${i}`} x1={i * 29.2} y1={0} x2={i * 29.2} y2={110} stroke="#1e293b" strokeWidth="0.3" />))}
-            {/* Continents */}
-            <path d="M30,15 L60,10 L80,15 L85,25 L80,35 L70,45 L55,50 L40,55 L30,50 L20,40 L15,30 L20,20 Z" fill="#1e293b" stroke="#475569" strokeWidth="0.5" />
-            <path d="M60,55 L75,50 L80,55 L82,65 L78,80 L70,90 L60,95 L55,90 L50,78 L52,65 Z" fill="#1e293b" stroke="#475569" strokeWidth="0.5" />
-            <path d="M155,12 L175,10 L185,15 L190,22 L185,28 L175,30 L165,28 L158,25 L152,18 Z" fill="#1e293b" stroke="#475569" strokeWidth="0.5" />
-            <path d="M155,35 L175,32 L185,38 L190,50 L185,65 L175,75 L165,78 L155,72 L148,60 L150,45 Z" fill="#1e293b" stroke="#475569" strokeWidth="0.5" />
-            <path d="M195,10 L240,8 L270,12 L290,18 L295,30 L285,40 L265,45 L240,42 L220,38 L200,32 L190,25 L192,15 Z" fill="#1e293b" stroke="#475569" strokeWidth="0.5" />
-            <path d="M270,65 L295,60 L310,65 L315,75 L305,82 L290,85 L275,80 L268,72 Z" fill="#1e293b" stroke="#475569" strokeWidth="0.5" />
-            {/* Attack points */}
+            {[...Array(9)].map((_, i) => (<line key={`h${i}`} x1={0} y1={(i + 1) * 50} x2={1000} y2={(i + 1) * 50} stroke="#1e293b" strokeWidth="0.5" opacity="0.4" />))}
+            {[...Array(19)].map((_, i) => (<line key={`v${i}`} x1={(i + 1) * 50} y1={0} x2={(i + 1) * 50} y2={500} stroke="#1e293b" strokeWidth="0.5" opacity="0.4" />))}
+            {/* Equator */}
+            <line x1={0} y1={250} x2={1000} y2={250} stroke="#334155" strokeWidth="0.5" strokeDasharray="8,4" opacity="0.5" />
+            {/* Continent outlines */}
+            {Object.entries(MAP_PATHS).map(([name, d]) => (
+              <path key={name} d={d} fill="#1e293b" stroke="#475569" strokeWidth="1" strokeLinejoin="round" />
+            ))}
+            {/* Attack points plotted by lat/long */}
             {geoPoints.map((pt, i) => {
               const color = pt.severity >= 7 ? '#ef4444' : pt.severity >= 4 ? '#f59e0b' : '#10b981';
               return (
                 <g key={i}>
-                  <circle cx={pt.pos.x} cy={pt.pos.y} r="4" fill="none" stroke={color} strokeWidth="0.5" opacity="0.4">
-                    <animate attributeName="r" from="2" to="8" dur="2s" repeatCount="indefinite" />
-                    <animate attributeName="opacity" from="0.6" to="0" dur="2s" repeatCount="indefinite" />
+                  <circle cx={pt.pos.x} cy={pt.pos.y} r="12" fill="none" stroke={color} strokeWidth="1" opacity="0.3">
+                    <animate attributeName="r" from="6" to="20" dur="2s" repeatCount="indefinite" />
+                    <animate attributeName="opacity" from="0.5" to="0" dur="2s" repeatCount="indefinite" />
                   </circle>
-                  <circle cx={pt.pos.x} cy={pt.pos.y} r="2" fill={color} opacity="0.9">
+                  <circle cx={pt.pos.x} cy={pt.pos.y} r="5" fill={color} opacity="0.85">
                     <title>{`${pt.type} — ${pt.ip} (${pt.city || ''}, ${pt.country || 'Unknown'}) — Severity: ${pt.severity}/10`}</title>
                   </circle>
                 </g>
@@ -508,11 +546,11 @@ const Dashboard = () => {
             })}
             {geoPoints.length === 0 && (
               <>
-                <circle cx={50} cy={30} r="2" fill="#f59e0b" opacity="0.7" />
-                <circle cx={170} cy={20} r="2" fill="#ef4444" opacity="0.7" />
-                <circle cx={250} cy={25} r="2" fill="#ef4444" opacity="0.7" />
-                <circle cx={290} cy={70} r="2" fill="#10b981" opacity="0.7" />
-                <text x={175} y={55} textAnchor="middle" fill="#475569" fontSize="4">No geo-located attacks</text>
+                <circle cx={150} cy={140} r="5" fill="#f59e0b" opacity="0.6" />
+                <circle cx={490} cy={80} r="5" fill="#ef4444" opacity="0.6" />
+                <circle cx={720} cy={110} r="5" fill="#ef4444" opacity="0.6" />
+                <circle cx={790} cy={310} r="5" fill="#10b981" opacity="0.6" />
+                <text x={500} y={260} textAnchor="middle" fill="#475569" fontSize="14">No geo-located attacks</text>
               </>
             )}
           </svg>
