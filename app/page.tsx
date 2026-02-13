@@ -1,13 +1,13 @@
 'use client';
 
-// Isolate from root layout to avoid auth errors
-// Do NOT import anything from lib/, app/actions/, or components that use database
-
+// Isolated client component with integrated AI security
 import React, { useState, useEffect, useRef } from 'react';
+import { sendChatMessage } from '@/app/actions/chat';
+import { getAIAttackCount } from '@/lib/ai-attack-logger';
 import { 
   Shield, MessageSquare, Activity, BookOpen, Info, Phone, Map, AlertTriangle,
   Send, CheckCircle, Users, Globe, Lock, Mail, ShieldCheck,
-  Server, Zap, Clock, BarChart3
+  Server, Zap, Clock, BarChart3, Bot
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -25,6 +25,8 @@ interface Message {
   text: string;
   isUser: boolean;
   timestamp: Date;
+  blocked?: boolean;
+  loading?: boolean;
 }
 
 interface AttackLog {
@@ -131,6 +133,7 @@ const Dashboard = () => {
   const [threats, setThreats] = useState(0);
   const [blocked, setBlocked] = useState(0);
   const [attackLogs, setAttackLogs] = useState<AttackLog[]>([]);
+  const [aiAttacks, setAiAttacks] = useState({ promptInjection: 0, outputLeak: 0, toolDenied: 0, total: 0 });
 
   useEffect(() => {
     const fetchAttackLogs = async () => {
@@ -165,14 +168,26 @@ const Dashboard = () => {
       }
     };
 
+    const fetchAIAttacks = async () => {
+      try {
+        const counts = await getAIAttackCount();
+        setAiAttacks(counts);
+      } catch (error) {
+        console.error("Failed to fetch AI attack counts:", error);
+      }
+    };
+
     fetchAttackLogs();
     fetchThreatActivity();
+    fetchAIAttacks();
     const attackLogsInterval = setInterval(fetchAttackLogs, 5000);
     const threatActivityInterval = setInterval(fetchThreatActivity, 5000);
+    const aiAttacksInterval = setInterval(fetchAIAttacks, 5000);
 
     return () => {
       clearInterval(attackLogsInterval);
       clearInterval(threatActivityInterval);
+      clearInterval(aiAttacksInterval);
     };
   }, []);
 
@@ -245,7 +260,7 @@ const Dashboard = () => {
         </motion.button>
       </motion.div>
 
-      {/* Stats Row */}
+      {/* Threat Activity with AI Security Metrics */}
       <motion.div 
         whileHover={{ y: -4 }}
         className="lg:col-span-2 bg-slate-900/80 backdrop-blur border border-slate-800 p-6 rounded-2xl"
@@ -261,7 +276,7 @@ const Dashboard = () => {
             />
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-6">
+        <div className="grid grid-cols-3 gap-4 mb-6">
           <div>
             <p className="text-3xl font-bold text-slate-100">{threats.toLocaleString()}</p>
             <p className="text-xs text-slate-500 mt-1">Threats Detected</p>
@@ -271,11 +286,25 @@ const Dashboard = () => {
             <p className="text-xs text-slate-500 mt-1">Attacks Blocked</p>
           </div>
           <div>
-            <p className="text-3xl font-bold text-blue-400">0.003s</p>
-            <p className="text-xs text-slate-500 mt-1">Avg Response Time</p>
+            <p className="text-3xl font-bold text-purple-400">{aiAttacks.promptInjection}</p>
+            <p className="text-xs text-slate-500 mt-1">Prompt Injections</p>
           </div>
         </div>
-        <div className="mt-6 h-24 flex items-end gap-1">
+        <div className="grid grid-cols-3 gap-4 mb-6">
+          <div>
+            <p className="text-2xl font-bold text-blue-400">0.003s</p>
+            <p className="text-xs text-slate-500 mt-1">Avg Response Time</p>
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-purple-400">{aiAttacks.outputLeak}</p>
+            <p className="text-xs text-slate-500 mt-1">Output Leaks</p>
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-purple-400">{aiAttacks.toolDenied}</p>
+            <p className="text-xs text-slate-500 mt-1">Tool Denied</p>
+          </div>
+        </div>
+        <div className="h-24 flex items-end gap-1">
           {[40, 65, 45, 80, 55, 90, 70, 85, 60, 75, 50, 95, 70, 80, 65].map((h, i) => (
             <motion.div
               key={i}
@@ -293,30 +322,30 @@ const Dashboard = () => {
         whileHover={{ y: -4 }}
         className="bg-slate-900/80 backdrop-blur border border-slate-800 p-6 rounded-2xl overflow-hidden"
       >
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-6">
           <h3 className="text-slate-400 text-xs uppercase tracking-wider font-semibold">Live Attack Logs</h3>
           <BarChart3 className="text-slate-600" size={16} />
         </div>
-        <div className="space-y-3 max-h-48 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+        <div className="space-y-3 h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
           {attackLogs.map((log, i) => (
             <motion.div 
               key={log.id}
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: i * 0.1 }}
-              className="flex items-center justify-between p-2 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition-colors"
+              className="flex items-center justify-between p-4 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition-colors"
             >
               <div>
-                <span className={`text-xs font-mono ${log.severity >= 7 ? 'text-red-400' : log.severity >= 4 ? 'text-amber-400' : 'text-slate-400'}`}>
+                <span className={`text-sm font-mono ${log.severity >= 7 ? 'text-red-400' : log.severity >= 4 ? 'text-amber-400' : 'text-slate-400'}`}>
                   {log.ip}
                 </span>
-                <p className="text-[10px] text-slate-500">{log.type}</p>
+                <p className="text-xs text-slate-500 mt-1">{log.type}</p>
               </div>
               <div className="text-right">
-                <span className={`text-[10px] px-2 py-0.5 rounded-full ${log.severity >= 7 ? 'bg-red-500/20 text-red-400' : log.severity >= 4 ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-700 text-slate-400'}`}>
+                <span className={`text-sm px-2.5 py-1 rounded-full ${log.severity >= 7 ? 'bg-red-500/20 text-red-400' : log.severity >= 4 ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-700 text-slate-400'}`}>
                   {log.severity}/10
                 </span>
-                <p className="text-[10px] text-slate-500 mt-1">{new Date(log.timestamp).toLocaleTimeString()}</p>
+                <p className="text-xs text-slate-500 mt-1">{new Date(log.timestamp).toLocaleTimeString()}</p>
               </div>
             </motion.div>
           ))}
@@ -380,13 +409,15 @@ const Dashboard = () => {
   );
 };
 
-// 3. CHATBOT COMPONENT
+// 3. CHATBOT COMPONENT (WITH AI GOVERNANCE)
 const Chatbot = () => {
   const [messages, setMessages] = useState<Message[]>([
-    { id: 1, text: 'Hello! I am SECURE_BOT, your security assistant. How can I help you today?', isUser: false, timestamp: new Date() }
+    { id: 1, text: 'Hello! I am SECURE_BOT, your AI security assistant with built-in prompt injection protection. How can I help you today?', isUser: false, timestamp: new Date() }
   ]);
   const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const nextIdRef = useRef(2); // Track next message ID to avoid duplicates
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -396,35 +427,65 @@ const Chatbot = () => {
     scrollToBottom();
   }, [messages]);
 
-  const handleSend = () => {
-    if (!input.trim()) return;
+  const handleSend = async () => {
+    if (!input.trim() || isLoading) return;
     
     const userMsg: Message = {
-      id: messages.length + 1,
+      id: nextIdRef.current++,
       text: input,
       isUser: true,
       timestamp: new Date()
     };
     
+    const userInput = input;
     setMessages(prev => [...prev, userMsg]);
     setInput('');
+    setIsLoading(true);
     
-    setTimeout(() => {
-      const responses = [
-        'I understand your concern. Let me check the security logs for you.',
-        'That\'s a great question about network security. Here\'s what I found...',
-        'I\'ve analyzed the threat pattern. It appears to be a low-risk probe.',
-        'Would you like me to generate a detailed security report?',
-        'Your system is currently protected. No immediate action required.',
-      ];
+    // Add loading indicator
+    const loadingMsg: Message = {
+      id: nextIdRef.current++,
+      text: 'Analyzing your request...',
+      isUser: false,
+      timestamp: new Date(),
+      loading: true,
+    };
+    setMessages(prev => [...prev, loadingMsg]);
+    
+    try {
+      // Call AI-protected server action
+      const response = await sendChatMessage(userInput);
+      
+      // Remove loading message
+      setMessages(prev => prev.filter(m => !m.loading));
+      
+      // Add bot response
       const botMsg: Message = {
-        id: messages.length + 2,
-        text: responses[Math.floor(Math.random() * responses.length)],
+        id: nextIdRef.current++,
+        text: response.message,
         isUser: false,
-        timestamp: new Date()
+        timestamp: new Date(),
+        blocked: response.blocked || false,
       };
+      
       setMessages(prev => [...prev, botMsg]);
-    }, 1000 + Math.random() * 1000);
+    } catch (error) {
+      console.error('[CHAT] Error:', error);
+      
+      // Remove loading message
+      setMessages(prev => prev.filter(m => !m.loading));
+      
+      // Show error message
+      const errorMsg: Message = {
+        id: nextIdRef.current++,
+        text: 'I encountered an error processing your request. Please try again.',
+        isUser: false,
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, errorMsg]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -464,9 +525,29 @@ const Chatbot = () => {
             transition={{ duration: 0.3 }}
             className={`flex ${msg.isUser ? 'justify-end' : 'justify-start'}`}
           >
-            <div className={`max-w-[70%] ${msg.isUser ? 'bg-gradient-to-r from-blue-600 to-blue-500' : 'bg-slate-800'} rounded-2xl px-4 py-3`}>
-              <p className={`text-sm ${msg.isUser ? 'text-white' : 'text-slate-200'}`}>{msg.text}</p>
-              <p className={`text-[10px] mt-1 ${msg.isUser ? 'text-blue-200' : 'text-slate-500'}`}>
+            <div className={`max-w-[70%] ${
+              msg.loading 
+                ? 'bg-slate-700/50 animate-pulse' 
+                : msg.blocked 
+                  ? 'bg-gradient-to-r from-red-600 to-red-500 border-2 border-red-400' 
+                  : msg.isUser 
+                    ? 'bg-gradient-to-r from-blue-600 to-blue-500' 
+                    : 'bg-slate-800'
+            } rounded-2xl px-4 py-3`}>
+              {msg.blocked && (
+                <div className="flex items-center gap-2 mb-2 text-red-200">
+                  <Shield size={14} />
+                  <span className="text-xs font-semibold">SECURITY: Prompt Injection Blocked</span>
+                </div>
+              )}
+              <p className={`text-sm whitespace-pre-line ${
+                msg.loading ? 'text-slate-400 italic' : msg.isUser ? 'text-white' : 'text-slate-200'
+              }`}>
+                {msg.text}
+              </p>
+              <p className={`text-[10px] mt-1 ${
+                msg.loading ? 'text-slate-500' : msg.isUser ? 'text-blue-200' : 'text-slate-500'
+              }`}>
                 {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </p>
             </div>
@@ -487,12 +568,26 @@ const Chatbot = () => {
             className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
           />
           <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+            whileHover={{ scale: isLoading ? 1 : 1.05 }}
+            whileTap={{ scale: isLoading ? 1 : 0.95 }}
             onClick={handleSend}
-            className="bg-gradient-to-r from-blue-600 to-blue-500 text-white px-6 py-3 rounded-xl flex items-center gap-2 font-medium hover:shadow-lg hover:shadow-blue-500/25 transition-all"
+            disabled={isLoading}
+            className={`${
+              isLoading 
+                ? 'bg-slate-700 cursor-not-allowed' 
+                : 'bg-gradient-to-r from-blue-600 to-blue-500 hover:shadow-lg hover:shadow-blue-500/25'
+            } text-white px-6 py-3 rounded-xl flex items-center gap-2 font-medium transition-all`}
           >
-            <Send size={18} />
+            {isLoading ? (
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+              >
+                <Shield size={18} />
+              </motion.div>
+            ) : (
+              <Send size={18} />
+            )}
           </motion.button>
         </div>
       </div>
