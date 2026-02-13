@@ -1,7 +1,7 @@
 "use server";
 
 import { db, projects } from "@/lib/db";
-import { isAdmin } from "@/lib/auth";
+import { isAdmin, getCurrentUser } from "@/lib/auth";
 import { asc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -10,10 +10,14 @@ import {
   projectCreateInputSchema,
   projectSchema
 } from "@/lib/types";
+import { logAuditEvent } from "@/lib/security/audit";
+import { requireAdminSession } from "@/lib/security/session";
+import { sanitizeError } from "@/lib/security/errors";
 
 /**
  * Server action to fetch all projects
  * Uses Drizzle schema types directly
+ * Public read - no authentication required (read-only operation)
  */
 export async function getProjects(): Promise<Project[]> {
   try {
@@ -32,31 +36,26 @@ export async function getProjects(): Promise<Project[]> {
     }));
   } catch (error) {
     console.error("Error fetching projects:", error);
-    // Consider re-throwing a more specific error or returning an empty array
-    // depending on how you want the frontend to handle this failure.
-    // For now, re-throwing to indicate failure.
-    throw new Error("Failed to fetch projects due to data parsing or DB error.");
+    const sanitized = sanitizeError(error, "DB_003");
+    // For read operations, we can throw to indicate failure
+    throw new Error(sanitized.publicMessage);
   }
 }
 
 /**
  * Server action to create a new project
  * Uses revised server actions pattern with typed responses
+ * Requires admin authentication and logs all actions
  */
 export async function createProject(
   prevState: { success: boolean; message: string; project: Project | null } | null,
   formData: FormData | z.infer<typeof projectCreateInputSchema>
 ) {
+  let currentUser = null;
+  
   try {
-    // Check if the user is an admin
-    const userIsAdmin = await isAdmin();
-    if (!userIsAdmin) {
-      return { 
-        success: false, 
-        message: "Unauthorized. Only admins can create projects.", 
-        project: null 
-      };
-    }
+    // Require admin session with revalidation
+    currentUser = await requireAdminSession();
     
     // Handle both FormData and direct object submission
     let data: z.infer<typeof projectCreateInputSchema>;
@@ -74,9 +73,18 @@ export async function createProject(
         try {
           items = JSON.parse(itemsData as string);
         } catch (e) {
+          await logAuditEvent({
+            userId: currentUser.clerkId,
+            userEmail: currentUser.email,
+            action: "PROJECT_CREATE",
+            resourceType: "project",
+            status: "failed",
+            metadata: { reason: "Invalid items format", error: String(e) }
+          });
+          
           return { 
             success: false, 
-            message: "Invalid items data format" + (e instanceof Error ? `: ${e.message}` : ""), 
+            message: "Invalid items data format", 
             project: null 
           };
         }
@@ -91,23 +99,40 @@ export async function createProject(
     // Validate input data using Zod schema
     const validatedData = projectCreateInputSchema.safeParse(data);
     if (!validatedData.success) {
+      await logAuditEvent({
+        userId: currentUser.clerkId,
+        userEmail: currentUser.email,
+        action: "PROJECT_CREATE",
+        resourceType: "project",
+        status: "failed",
+        metadata: { reason: "Validation error", errors: validatedData.error.errors }
+      });
+      
       return { 
         success: false, 
-        message: "Validation error: " + validatedData.error.message, 
+        message: "Validation error: " + validatedData.error.errors[0]?.message, 
         project: null 
       };
     }
     
     // Insert the new project into the database
-    // Drizzle handles createdAt/updatedAt automatically if defaultNow() is set in schema
     const inserted = await db.insert(projects).values({
       title: validatedData.data.title,
       description: validatedData.data.description,
       icon: validatedData.data.icon,
-      items: validatedData.data.items, // Ensure items are correctly formatted JSON for DB if needed
-    }).returning(); // Add returning() to get the inserted project data
+      items: validatedData.data.items,
+    }).returning();
 
     if (!inserted || inserted.length === 0) {
+      await logAuditEvent({
+        userId: currentUser.clerkId,
+        userEmail: currentUser.email,
+        action: "PROJECT_CREATE",
+        resourceType: "project",
+        status: "failed",
+        metadata: { reason: "Database insert failed" }
+      });
+      
       return { 
         success: false, 
         message: "Failed to create project in database.", 
@@ -115,11 +140,24 @@ export async function createProject(
       };
     }
 
-    // Parse the newly inserted project data to ensure it matches the Project type
+    // Parse the newly inserted project data
     const newProject = projectSchema.parse({
       ...inserted[0],
-      // Ensure items is parsed correctly if it comes back from DB differently
       items: typeof inserted[0].items === 'string' ? JSON.parse(inserted[0].items) : inserted[0].items,
+    });
+    
+    // Log successful project creation
+    await logAuditEvent({
+      userId: currentUser.clerkId,
+      userEmail: currentUser.email,
+      action: "PROJECT_CREATE",
+      resourceType: "project",
+      resourceId: newProject.id.toString(),
+      status: "success",
+      metadata: {
+        projectTitle: newProject.title,
+        projectId: newProject.id
+      }
     });
     
     // Revalidate the path to update the cache
@@ -128,15 +166,27 @@ export async function createProject(
     return { 
       success: true, 
       message: "Project created successfully!", 
-      project: newProject // Return the parsed new project
+      project: newProject
     };
     
   } catch (error) {
+    // Log failed project creation
+    if (currentUser) {
+      await logAuditEvent({
+        userId: currentUser.clerkId,
+        userEmail: currentUser.email,
+        action: "PROJECT_CREATE",
+        resourceType: "project",
+        status: "failed",
+        metadata: { error: String(error) }
+      });
+    }
+    
     console.error("Error creating project:", error);
-    // Provide a more generic error message to the client
+    const sanitized = sanitizeError(error, "DB_004");
     return { 
       success: false, 
-      message: "An unexpected error occurred while creating the project.", 
+      message: sanitized.publicMessage, 
       project: null 
     };
   }
