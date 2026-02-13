@@ -1,6 +1,6 @@
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
-import { boolean, pgTable, serial, text, timestamp, varchar, json } from "drizzle-orm/pg-core";
+import { boolean, pgTable, serial, text, timestamp, varchar, json, integer } from "drizzle-orm/pg-core";
 
 
 console.log("Initializing database connection...");
@@ -77,6 +77,19 @@ export const projects = pgTable("projects", {
   items: json("items").notNull(), // Store items as a JSON array
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Define the attack logs table schema
+export const attackLogs = pgTable("attack_logs", {
+  id: serial("id").primaryKey(),
+  ip: text("ip").notNull(),
+  severity: integer("severity").notNull(),
+  type: text("type").notNull(),
+  timestamp: timestamp("timestamp").defaultNow(),
+  city: text("city"),
+  country: text("country"),
+  latitude: text("latitude"),
+  longitude: text("longitude"),
 });
 
 // Contact submissions table removed as requested

@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint app components lib hooks --ignore-pattern node_modules/",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx scripts/migrate.ts",
+    "db:migrate": "tsx scripts/run-migrations.ts",
     "db:push": "drizzle-kit push"
   },
   "dependencies": {
@@ -105,6 +105,7 @@
     "eslint-config-next": "^15.3.1",
     "postcss": "^8",
     "tailwindcss": "^3.4.17",
+    "tsx": "^4.21.0",
     "typescript": "^5"
   }
 }
