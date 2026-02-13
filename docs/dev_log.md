@@ -1,5 +1,54 @@
 # Development Log
 
+## 2026-02-14 - Analytics Dashboard: Fully Functional Upgrade
+**Timestamp:** 2026-02-14 ~UTC  
+**Modified by:** GitHub Copilot (AI Assistant)  
+**Branch:** sam-part-2
+
+### Changes Made:
+1. **Replaced static mock Dashboard with fully functional analytics**
+   - File: `app/ui/page.tsx`
+   - Dashboard now fetches real attack logs from `/api/attack-logs` API endpoint (Drizzle ORM â†’ Neon Postgres)
+   - Auto-refreshes every 30 seconds with manual refresh button
+   - Loading and error states with graceful fallback
+
+2. **Added real Recharts-powered charts (replacing static bar images)**
+   - **Area Chart** â€” Threat severity timeline (Critical/Medium/Low stacked) grouped by hour
+   - **Horizontal Bar Chart** â€” Attack type breakdown (SQL Injection, XSS, Bot Traffic, etc.)
+   - **Pie Chart** â€” Severity distribution donut (Critical/Medium/Low counts)
+   - All charts use `recharts` (already in dependencies, v2.15.0)
+
+3. **Added SVG world map to Global Threat Map**
+   - Replaced Lucide `<Map>` icon placeholder with actual SVG continent outlines
+   - Geo-plots attack locations using `latitude`/`longitude` from `attack_logs` table via `geoToXY()` equirectangular projection
+   - Animated pulse rings on threat dots, color-coded by severity
+   - Shows fallback markers when no geo-data is available
+   - Displays count of monitored countries and geo-located threats
+
+4. **Active Alerts now show real security recommendations**
+   - Built `getRecommendation()` engine that maps attack types to actionable security guidance
+   - Covers: SQL Injection â†’ "Harden Input Validation", Brute Force â†’ "Enforce Rate Limiting", XSS â†’ "Sanitize All Outputs", Bot â†’ "Strengthen Bot Protection", DDoS â†’ "Activate DDoS Mitigation", Prompt Injection â†’ "Apply AI Guardrails"
+   - Each recommendation includes urgency level (critical/high/medium), specific remediation steps, and the triggering attack details
+   - Expandable accordion UI shows full detail per recommendation
+
+5. **New Recommended Actions panel**
+   - Dedicated expandable card listing all unique threat types (severity â‰¥ 5) with prioritized remediation guidance
+   - Click to expand each recommendation for full context
+
+6. **Live Attack Logs now show real data**
+   - Replaced hardcoded `ATTACK_LOGS` array with API-fetched data
+   - Shows IP, attack type, severity badge, geo-location, and relative timestamp
+   - Displays up to 15 most recent entries
+
+### Technical Details:
+- Added imports: `useCallback`, `useMemo`, `recharts` (AreaChart, BarChart, PieChart, etc.), additional Lucide icons
+- Updated `AttackLog` interface to include `id`, `city`, `country`, `latitude`, `longitude` fields matching DB schema
+- Removed unused `Map` icon import from Lucide
+- Build verified: `next build` passes with zero errors
+- No new dependencies added (recharts was already installed)
+
+---
+
 ## 2026-02-09 - Security Audit & Dependency Fixes
 **Timestamp:** 2026-02-09 14:28 UTC  
 **Modified by:** GitHub Copilot (AI Assistant)
@@ -626,7 +675,8 @@ export const dynamic = 'force-dynamic';
 - Dynamic rendering is appropriate for blog content that updates frequently
 - No impact on security or performance
 - Clerk configuration already set in Vercel environment variables
- 
+
+ 
  - - - 
  
  # #   2 0 2 6 - 0 2 - 1 1   -   F i x e d   P r o j e c t s   P a g e   B u i l d   E r r o r 
@@ -664,7 +714,8 @@ export const dynamic = 'force-dynamic';
  -   A l l   d a t a b a s e - q u e r y i n g   p a g e s   n o w   c o n f i g u r e d   f o r   d y n a m i c   r e n d e r i n g 
  -   T h i s   i s   t h e   c o r r e c t   a r c h i t e c t u r e   f o r   a d m i n - m a n a g e d   c o n t e n t 
  -   E n v i r o n m e n t   v a r i a b l e s   c o n f i r m e d   s e t   f o r   P r e v i e w   d e p l o y m e n t s 
- -   N o   r e m a i n i n g   s t a t i c   g e n e r a t i o n   d a t a b a s e   i s s u e s   d e t e c t e d  
+ -   N o   r e m a i n i n g   s t a t i c   g e n e r a t i o n   d a t a b a s e   i s s u e s   d e t e c t e d 
+ 
  
 ---
 
@@ -1171,10 +1222,12 @@ Integrated all Zero Trust security enhancements from lib/security/ into producti
 #### 2. Admin Actions
 **File:** pp/actions/admin.ts
 **Changes:**
-- ? Imported security utilities: logAuditEvent, equireAdminSession, sanitizeError
+- ? Imported security utilities: logAuditEvent, 
+equireAdminSession, sanitizeError
 - ? checkAdminStatus(): Added audit logging for admin status checks
 - ? getUser(): Added audit logging for user info retrieval
-- ? getUsers(): Replaced isAdmin() with equireAdminSession(), added success/failure audit logs
+- ? getUsers(): Replaced isAdmin() with 
+equireAdminSession(), added success/failure audit logs
 - ? setUserRole(): Full audit trail (validation failures, user not found, successful updates), captures old/new role values
 
 **Security Improvements:**
@@ -1186,9 +1239,11 @@ Integrated all Zero Trust security enhancements from lib/security/ into producti
 #### 3. Project Actions
 **File:** pp/actions/projects.ts
 **Changes:**
-- ? Imported security utilities: logAuditEvent, equireAdminSession, sanitizeError, getCurrentUser
+- ? Imported security utilities: logAuditEvent, 
+equireAdminSession, sanitizeError, getCurrentUser
 - ? getProjects(): Added error sanitization (public read, no auth required)
-- ? createProject(): Replaced isAdmin() with equireAdminSession(), added comprehensive audit logging
+- ? createProject(): Replaced isAdmin() with 
+equireAdminSession(), added comprehensive audit logging
 
 **Audit Logging for createProject():**
 - Invalid items format
@@ -1241,7 +1296,8 @@ Integrated all Zero Trust security enhancements from lib/security/ into producti
 
 #### 2. ? Session Revalidation (Issue #5)
 **Implementation:**
-- equireAdminSession() replaces basic isAdmin() checks
+- 
+equireAdminSession() replaces basic isAdmin() checks
 - Validates user still exists in database
 - Checks role hasn't changed since Clerk session created
 - Blocks operations if session is stale or role revoked
@@ -1379,7 +1435,8 @@ export const auditLogs = pgTable('audit_logs', {
 
 #### Session Revalidation Flow:
 1. User calls admin server action
-2. equireAdminSession() validates Clerk session
+2. 
+equireAdminSession() validates Clerk session
 3. Query database for user by clerkId
 4. Check if role is still "admin"
 5. Throw error if user not found or role changed
@@ -2337,17 +2394,17 @@ Successfully integrated AI attack statistics into the security dashboard. The da
 **New Card Layout:**
 ```
 +---------------------------------+
-¦  AI SECURITY            ??      ¦
-¦                                 ¦
-¦  42  ? Prompt Injections Blocked¦
-¦                                 ¦
-¦  +---------------------+       ¦
-¦  ¦ 3        ¦ 1        ¦       ¦
-¦  ¦ Output   ¦ Tool     ¦       ¦
-¦  ¦ Leaks    ¦ Denied   ¦       ¦
-¦  +---------------------+       ¦
-¦                                 ¦
-¦  ??? Layer 3 Active              ¦
+ï¿½  AI SECURITY            ??      ï¿½
+ï¿½                                 ï¿½
+ï¿½  42  ? Prompt Injections Blockedï¿½
+ï¿½                                 ï¿½
+ï¿½  +---------------------+       ï¿½
+ï¿½  ï¿½ 3        ï¿½ 1        ï¿½       ï¿½
+ï¿½  ï¿½ Output   ï¿½ Tool     ï¿½       ï¿½
+ï¿½  ï¿½ Leaks    ï¿½ Denied   ï¿½       ï¿½
+ï¿½  +---------------------+       ï¿½
+ï¿½                                 ï¿½
+ï¿½  ??? Layer 3 Active              ï¿½
 +---------------------------------+
 ```
 
@@ -2392,10 +2449,10 @@ UI Re-renders:
 **Multi-Layer Defense Dashboard:**
 ```
 +-------------------------------------------------------+
-¦  Chatbot    ¦  Database   ¦  Active     ¦  AI         ¦
-¦  Service    ¦  Integrity  ¦  Alerts     ¦  Security   ¦
-¦  ?? Blue    ¦  ?? Green   ¦  ?? Amber   ¦  ?? Purple  ¦
-¦  Network    ¦  Auth       ¦  Monitoring ¦  AI Gov     ¦
+ï¿½  Chatbot    ï¿½  Database   ï¿½  Active     ï¿½  AI         ï¿½
+ï¿½  Service    ï¿½  Integrity  ï¿½  Alerts     ï¿½  Security   ï¿½
+ï¿½  ?? Blue    ï¿½  ?? Green   ï¿½  ?? Amber   ï¿½  ?? Purple  ï¿½
+ï¿½  Network    ï¿½  Auth       ï¿½  Monitoring ï¿½  AI Gov     ï¿½
 +-------------------------------------------------------+
 ```
 
@@ -3104,14 +3161,14 @@ Removed all markdown formatting (asterisks) from chatbot responses to make them 
 
 **Example Before:**
 ```
-• **Network Layer**: Arcjet WAF blocking...
-• **AI Layer**: Prompt injection detection...
+ï¿½ **Network Layer**: Arcjet WAF blocking...
+ï¿½ **AI Layer**: Prompt injection detection...
 ```
 
 **Example After:**
 ```
-• Network Layer: Arcjet WAF blocking...
-• AI Layer: Prompt injection detection...
+ï¿½ Network Layer: Arcjet WAF blocking...
+ï¿½ AI Layer: Prompt injection detection...
 ```
 
 ---
@@ -3198,8 +3255,8 @@ Adjusted Live Attack Logs to match the full content height of Threat Activity se
 ```
 THREAT ACTIVITY          LIVE ATTACK LOGS
 +- Header (mb-6)         +- Header (mb-6)
-+- Metrics Row 1         ¦
-+- Metrics Row 2         ¦
++- Metrics Row 1         ï¿½
++- Metrics Row 2         ï¿½
 +- Chart (h-24)          +- Log Entries (flex-1)
 +- [Bottom]              +- [Bottom] ? Aligned!
 ```
@@ -3285,7 +3342,7 @@ Removed invisible spacers and used flex-1 to make log entries span from first me
 THREAT ACTIVITY              LIVE ATTACK LOGS
 +- Header + mb-6             +- Header + mb-6
 +- Metrics Row 1 ----------- +
-+- Metrics Row 2             ¦ Logs (flex-1)
++- Metrics Row 2             ï¿½ Logs (flex-1)
 +- Chart (h-24) ----------- ---+ ? Both end here!
 ```
 
@@ -4053,31 +4110,31 @@ Live Attack Logs Card (updates every 5 seconds)
 #### Live Attack Logs Card
 ```
 +----------------------------------+
-¦  Live Attack Logs                ¦
-+----------------------------------¦
-¦  192.168.1.100                   ¦
-¦  CLIENT:DEVTOOLS_DETECTED        ¦
-¦  Severity: 5/10  |  10:45:23 AM  ¦
-+----------------------------------¦
-¦  192.168.1.100                   ¦
-¦  CLIENT:COPY_ATTEMPT             ¦
-¦  Severity: 4/10  |  10:43:15 AM  ¦
-+----------------------------------¦
-¦  203.45.67.89                    ¦
-¦  CLIENT:RIGHT_CLICK_BLOCKED      ¦
-¦  Severity: 3/10  |  10:40:02 AM  ¦
+ï¿½  Live Attack Logs                ï¿½
++----------------------------------ï¿½
+ï¿½  192.168.1.100                   ï¿½
+ï¿½  CLIENT:DEVTOOLS_DETECTED        ï¿½
+ï¿½  Severity: 5/10  |  10:45:23 AM  ï¿½
++----------------------------------ï¿½
+ï¿½  192.168.1.100                   ï¿½
+ï¿½  CLIENT:COPY_ATTEMPT             ï¿½
+ï¿½  Severity: 4/10  |  10:43:15 AM  ï¿½
++----------------------------------ï¿½
+ï¿½  203.45.67.89                    ï¿½
+ï¿½  CLIENT:RIGHT_CLICK_BLOCKED      ï¿½
+ï¿½  Severity: 3/10  |  10:40:02 AM  ï¿½
 +----------------------------------+
 ```
 
 #### Threat Activity Card
 ```
 +----------------------------------+
-¦  Threat Activity                 ¦
-+----------------------------------¦
-¦  1,234  Threats Detected         ¦
-¦  1,200  Attacks Blocked          ¦
-¦   42    Prompt Injections        ¦
-¦  0.003s Avg Response Time        ¦
+ï¿½  Threat Activity                 ï¿½
++----------------------------------ï¿½
+ï¿½  1,234  Threats Detected         ï¿½
+ï¿½  1,200  Attacks Blocked          ï¿½
+ï¿½   42    Prompt Injections        ï¿½
+ï¿½  0.003s Avg Response Time        ï¿½
 +----------------------------------+
 ```
 *Note: Client events contribute to "Threats Detected" count*
@@ -4152,7 +4209,7 @@ Live Attack Logs Card (updates every 5 seconds)
 
 **Storage:**
 - Each event: ~200-300 bytes in database
-- 10,000 events ˜ 2-3 MB
+- 10,000 events ï¿½ 2-3 MB
 - Auto-cleanup recommended after 30-90 days
 
 ---
@@ -4360,7 +4417,7 @@ const y = (1 - mercatorY / Math.PI) * 50; // Normalized to 0-100%
 
 **Why This Matters:**
 - Previous: Simple linear projection `y = ((90 - lat) / 180) * 100`
-  - Manila (14.6°N) would appear 71% down from top
+  - Manila (14.6ï¿½N) would appear 71% down from top
   - Equator would be exactly at 50%
   
 - Current: Web Mercator projection (standard for web maps)
@@ -4396,7 +4453,7 @@ const mockLocations = [
   { city: 'San Francisco', country_name: 'United States', latitude: 37.7749, longitude: -122.4194 },
   { city: 'London', country_name: 'United Kingdom', latitude: 51.5074, longitude: -0.1278 },
   { city: 'Mumbai', country_name: 'India', latitude: 19.0760, longitude: 72.8777 },
-  { city: 'São Paulo', country_name: 'Brazil', latitude: -23.5505, longitude: -46.6333 },
+  { city: 'Sï¿½o Paulo', country_name: 'Brazil', latitude: -23.5505, longitude: -46.6333 },
   { city: 'Moscow', country_name: 'Russia', latitude: 55.7558, longitude: 37.6173 },
   { city: 'Cairo', country_name: 'Egypt', latitude: 30.0444, longitude: 31.2357 },
 ];
@@ -4405,7 +4462,7 @@ const mockLocations = [
 **Geographic Coverage:**
 - ?? Asia-Pacific: Manila, Tokyo, Singapore, Sydney, Mumbai
 - ?? Europe/Middle East/Africa: London, Moscow, Cairo
-- ?? Americas: San Francisco, São Paulo
+- ?? Americas: San Francisco, Sï¿½o Paulo
 - Covers all continents except Antarctica
 - Demonstrates global reach of security monitoring
 
@@ -4470,56 +4527,56 @@ console.warn('[GEO] All geolocation services failed', fallbackError);
 
 **The Math:**
 ```
-X (longitude) = ((lng + 180) / 360) × 100
-  - Linear scaling: -180° to +180° maps to 0% to 100%
-  - Prime Meridian (0°) ? 50%
-  - International Date Line (±180°) ? 0% or 100%
+X (longitude) = ((lng + 180) / 360) ï¿½ 100
+  - Linear scaling: -180ï¿½ to +180ï¿½ maps to 0% to 100%
+  - Prime Meridian (0ï¿½) ? 50%
+  - International Date Line (ï¿½180ï¿½) ? 0% or 100%
 
 Y (latitude) = Mercator formula
-  1. Convert latitude to radians: latRad = lat × p / 180
+  1. Convert latitude to radians: latRad = lat ï¿½ p / 180
   2. Apply Mercator formula: mercatorY = ln(tan(p/4 + latRad/2))
-  3. Normalize to percentage: y = (1 - mercatorY / p) × 50
-  - Equator (0°) ? 50%
+  3. Normalize to percentage: y = (1 - mercatorY / p) ï¿½ 50
+  - Equator (0ï¿½) ? 50%
   - North latitudes (positive) ? <50%
   - South latitudes (negative) ? >50%
-  - Extreme latitudes (±85°) approach infinity (map limits)
+  - Extreme latitudes (ï¿½85ï¿½) approach infinity (map limits)
 ```
 
 **Example Calculations:**
 
-**Manila, Philippines (14.5995°N, 120.9842°E):**
+**Manila, Philippines (14.5995ï¿½N, 120.9842ï¿½E):**
 ```
-X = ((120.9842 + 180) / 360) × 100 = 83.6%
+X = ((120.9842 + 180) / 360) ï¿½ 100 = 83.6%
   ? Right side of map (Asia-Pacific region) ?
 
 Y calculation:
-  latRad = 14.5995 × p / 180 = 0.2549 radians
+  latRad = 14.5995 ï¿½ p / 180 = 0.2549 radians
   mercatorY = ln(tan(p/4 + 0.2549/2)) = ln(tan(0.9126)) = 0.2629
-  y = (1 - 0.2629/p) × 50 = 45.8%
+  y = (1 - 0.2629/p) ï¿½ 50 = 45.8%
   ? Slightly above equator (Northern Hemisphere) ?
 ```
 
-**London, UK (51.5074°N, -0.1278°E):**
+**London, UK (51.5074ï¿½N, -0.1278ï¿½E):**
 ```
-X = ((-0.1278 + 180) / 360) × 100 = 49.96%
+X = ((-0.1278 + 180) / 360) ï¿½ 100 = 49.96%
   ? Center of map (Prime Meridian) ?
 
 Y calculation:
-  latRad = 51.5074 × p / 180 = 0.8988 radians
+  latRad = 51.5074 ï¿½ p / 180 = 0.8988 radians
   mercatorY = ln(tan(p/4 + 0.8988/2)) = 1.2185
-  y = (1 - 1.2185/p) × 50 = 30.6%
+  y = (1 - 1.2185/p) ï¿½ 50 = 30.6%
   ? Upper third of map (high northern latitude) ?
 ```
 
-**São Paulo, Brazil (-23.5505°S, -46.6333°W):**
+**Sï¿½o Paulo, Brazil (-23.5505ï¿½S, -46.6333ï¿½W):**
 ```
-X = ((-46.6333 + 180) / 360) × 100 = 37.0%
+X = ((-46.6333 + 180) / 360) ï¿½ 100 = 37.0%
   ? Left side of map (South America) ?
 
 Y calculation:
-  latRad = -23.5505 × p / 180 = -0.4110 radians
+  latRad = -23.5505 ï¿½ p / 180 = -0.4110 radians
   mercatorY = ln(tan(p/4 + (-0.4110)/2)) = -0.4265
-  y = (1 - (-0.4265)/p) × 50 = 56.8%
+  y = (1 - (-0.4265)/p) ï¿½ 50 = 56.8%
   ? Below equator (Southern Hemisphere) ?
 ```
 
@@ -4545,7 +4602,7 @@ Y calculation:
 - ? Manila marker appears in Southeast Asia (Philippines)
 - ? Tokyo marker appears in East Asia (Japan)
 - ? London marker appears in Western Europe (UK, Prime Meridian)
-- ? São Paulo marker appears in South America (Brazil, below equator)
+- ? Sï¿½o Paulo marker appears in South America (Brazil, below equator)
 - ? Sydney marker appears in Australia (southeast)
 - ? San Francisco marker appears in North America (west coast)
 - ? Mumbai marker appears in South Asia (India)
@@ -4615,7 +4672,7 @@ Y calculation:
 ### ?? Performance & Accuracy
 
 **Coordinate Precision:**
-- Latitude/Longitude: 4 decimal places (±11 meters accuracy)
+- Latitude/Longitude: 4 decimal places (ï¿½11 meters accuracy)
 - Map positioning: Sub-pixel accuracy on most screens
 - Projection error: <0.5% deviation from standard Mercator
 
@@ -4729,7 +4786,7 @@ IPAPI_CO_API_KEY=your_key_here  # $15/month for 30K requests/day
 
 ### ?? Conclusion
 
-The Global Threat Map now displays attacks with **geographic precision** using industry-standard Web Mercator projection and dual geolocation services. Every threat marker appears exactly where the attack originated, from Manila to Moscow to São Paulo.
+The Global Threat Map now displays attacks with **geographic precision** using industry-standard Web Mercator projection and dual geolocation services. Every threat marker appears exactly where the attack originated, from Manila to Moscow to Sï¿½o Paulo.
 
 **Before:** Approximate positions with simple linear projection
 **After:** Accurate Web Mercator coordinates matching standard world maps
