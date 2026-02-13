@@ -3,13 +3,17 @@
 // Isolate from root layout to avoid auth errors
 // Do NOT import anything from lib/, app/actions/, or components that use database
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { 
-  Shield, MessageSquare, Activity, BookOpen, Info, Phone, Map, AlertTriangle,
+  Shield, MessageSquare, Activity, BookOpen, Info, Phone, AlertTriangle,
   Send, CheckCircle, Users, Globe, Lock, Mail, ShieldCheck,
-  Server, Zap, Clock, BarChart3
+  Server, Zap, Clock, BarChart3, RefreshCw, ShieldAlert, Ban, Eye, Key, FileWarning
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import {
+  AreaChart, Area, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer,
+  BarChart, Bar, PieChart, Pie, Cell
+} from 'recharts';
 
 // --- TYPES ---
 type TabId = 'dashboard' | 'chat' | 'guide' | 'about' | 'contact';
@@ -28,20 +32,100 @@ interface Message {
 }
 
 interface AttackLog {
+  id: number;
   ip: string;
   severity: number;
   timestamp: string;
   type: string;
+  city: string | null;
+  country: string | null;
+  latitude: string | null;
+  longitude: string | null;
 }
 
-// --- MOCK DATA ---
-const ATTACK_LOGS: AttackLog[] = [
-  { ip: '192.168.1.45', severity: 8, timestamp: '2 min ago', type: 'SQL Injection' },
-  { ip: '45.221.12.3', severity: 3, timestamp: '5 min ago', type: 'Port Scan' },
-  { ip: '103.45.67.89', severity: 6, timestamp: '12 min ago', type: 'Brute Force' },
-  { ip: '78.192.45.1', severity: 2, timestamp: '18 min ago', type: 'DDoS Attempt' },
-  { ip: '91.234.56.78', severity: 9, timestamp: '24 min ago', type: 'XSS Attack' },
-];
+// --- SECURITY RECOMMENDATIONS ENGINE ---
+function getRecommendation(attackType: string): { action: string; detail: string; icon: React.ElementType; urgency: 'critical' | 'high' | 'medium' | 'low' } {
+  const t = attackType.toLowerCase();
+  if (t.includes('sql') || t.includes('injection')) {
+    return { action: 'Harden Input Validation', detail: 'Enable parameterized queries on all endpoints. Review Drizzle ORM usage to ensure no raw SQL interpolation. Rotate DB credentials if data exfiltration is suspected.', icon: ShieldAlert, urgency: 'critical' };
+  }
+  if (t.includes('brute') || t.includes('rate') || t.includes('login')) {
+    return { action: 'Enforce Rate Limiting', detail: 'Tighten Arcjet rate-limit rules to max 5 attempts per minute per IP. Enable progressive back-off and account lockout after 10 failures. Consider adding CAPTCHA.', icon: Ban, urgency: 'high' };
+  }
+  if (t.includes('xss') || t.includes('script') || t.includes('shield')) {
+    return { action: 'Sanitize All Outputs', detail: 'Enable CSP headers with strict-dynamic. Audit all React dangerouslySetInnerHTML usage. Ensure Arcjet Shield WAF rules cover reflected and stored XSS vectors.', icon: FileWarning, urgency: 'high' };
+  }
+  if (t.includes('bot') || t.includes('scraping') || t.includes('crawl')) {
+    return { action: 'Strengthen Bot Protection', detail: 'Upgrade Arcjet bot detection to LIVE mode. Block known headless browser fingerprints. Add invisible honeypot fields to key forms.', icon: Eye, urgency: 'medium' };
+  }
+  if (t.includes('ddos') || t.includes('dos') || t.includes('flood')) {
+    return { action: 'Activate DDoS Mitigation', detail: 'Enable upstream CDN rate-limiting. Implement connection throttling at the edge. Review and scale compute auto-scaling policies.', icon: Zap, urgency: 'critical' };
+  }
+  if (t.includes('prompt') || t.includes('llm') || t.includes('ai')) {
+    return { action: 'Apply AI Guardrails', detail: 'Review system prompt boundaries. Enable Arcjet AI content filtering. Restrict MCP tool permissions to read-only where possible.', icon: Key, urgency: 'high' };
+  }
+  return { action: 'Investigate & Monitor', detail: 'Review full request payload in audit logs. Correlate with other IPs from the same subnet. Consider temporary IP ban if pattern continues.', icon: Eye, urgency: 'medium' };
+}
+
+function timeAgo(dateStr: string): string {
+  const now = new Date();
+  const then = new Date(dateStr);
+  const diffMs = now.getTime() - then.getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+// --- WORLD MAP SVG paths (equirectangular 1000×500, based on Natural Earth simplified outlines) ---
+const MAP_PATHS = {
+  // North America
+  northAmerica: "M130,55 L140,50 L155,48 L170,50 L185,45 L200,42 L215,45 L230,42 L240,48 L248,55 L255,60 L260,68 L258,78 L262,85 L268,90 L272,98 L265,105 L270,115 L275,120 L272,130 L268,138 L262,145 L255,148 L250,155 L242,160 L235,165 L228,170 L218,175 L210,172 L205,165 L195,168 L185,175 L178,180 L170,178 L162,185 L155,190 L148,192 L142,188 L138,195 L130,198 L122,195 L118,190 L110,188 L105,192 L98,188 L92,182 L88,175 L82,170 L78,162 L75,155 L70,148 L68,140 L65,132 L62,125 L58,118 L55,110 L50,102 L48,95 L45,88 L42,82 L40,75 L38,68 L42,62 L48,58 L55,55 L62,50 L70,48 L78,52 L85,55 L92,52 L100,50 L108,48 L115,50 L122,52 Z",
+  // Greenland
+  greenland: "M280,30 L295,28 L310,32 L318,38 L322,48 L318,58 L310,65 L300,68 L290,65 L282,58 L278,48 L275,40 Z",
+  // Central America
+  centralAmerica: "M155,190 L160,195 L165,200 L168,208 L172,215 L178,220 L182,225 L180,230 L175,232 L170,228 L165,225 L160,220 L155,215 L150,210 L148,205 L150,198 Z",
+  // South America
+  southAmerica: "M195,230 L205,225 L215,228 L225,232 L235,238 L242,245 L248,255 L252,265 L255,278 L258,290 L260,305 L258,318 L255,330 L250,342 L245,355 L238,365 L230,375 L222,382 L215,390 L208,395 L200,398 L195,395 L190,388 L185,378 L180,368 L178,355 L175,342 L172,330 L170,318 L168,305 L170,292 L172,280 L175,268 L178,258 L182,248 L188,238 Z",
+  // Europe
+  europe: "M470,55 L478,50 L488,48 L498,52 L508,48 L518,50 L525,55 L530,62 L535,58 L542,55 L548,60 L552,68 L548,75 L542,80 L535,85 L530,92 L525,98 L518,105 L510,110 L502,115 L495,118 L488,120 L480,122 L472,120 L465,115 L458,110 L452,105 L448,98 L445,92 L442,85 L445,78 L448,72 L452,65 L458,60 L465,58 Z",
+  // British Isles
+  britishIsles: "M440,60 L448,55 L455,58 L452,65 L448,70 L442,68 L438,65 Z",
+  // Scandinavia
+  scandinavia: "M488,22 L495,18 L505,20 L512,25 L518,32 L522,40 L520,48 L515,42 L508,38 L500,42 L495,48 L488,45 L482,38 L480,30 Z",
+  // Africa
+  africa: "M470,140 L480,135 L490,138 L500,135 L510,138 L520,142 L528,148 L535,158 L540,168 L542,180 L545,192 L548,205 L550,218 L548,232 L545,245 L540,258 L535,268 L528,278 L520,288 L512,295 L502,300 L492,302 L482,305 L472,302 L462,298 L455,290 L448,280 L442,268 L438,255 L435,242 L432,228 L430,215 L432,202 L435,190 L438,178 L442,168 L448,158 L455,150 L462,145 Z",
+  // Madagascar
+  madagascar: "M558,275 L565,270 L570,278 L568,288 L562,295 L555,290 L552,282 Z",
+  // Middle East
+  middleEast: "M535,105 L548,100 L558,105 L568,108 L575,115 L578,125 L575,135 L568,140 L558,142 L548,138 L540,132 L535,125 L530,118 L528,110 Z",
+  // Russia / Northern Asia
+  russia: "M525,22 L545,18 L565,20 L585,18 L605,15 L625,18 L645,15 L665,18 L685,20 L705,22 L725,18 L745,20 L762,22 L778,25 L790,30 L798,38 L802,48 L798,55 L790,60 L778,62 L765,58 L750,55 L735,58 L720,55 L705,58 L690,60 L675,58 L660,55 L645,58 L630,60 L615,58 L600,55 L585,58 L570,60 L558,58 L548,55 L540,50 L532,45 L525,38 L520,30 Z",
+  // Central/South Asia (India etc.)
+  southAsia: "M605,100 L618,95 L630,98 L642,102 L650,110 L655,120 L658,132 L660,145 L655,158 L648,168 L640,175 L630,178 L620,175 L612,168 L605,158 L600,148 L598,138 L595,128 L598,118 L600,108 Z",
+  // Southeast Asia
+  southeastAsia: "M668,155 L678,150 L690,152 L700,158 L708,165 L715,175 L718,185 L715,195 L708,200 L700,205 L690,202 L680,198 L672,190 L665,180 L662,170 L665,162 Z",
+  // China / East Asia
+  eastAsia: "M665,60 L680,55 L698,58 L715,55 L730,60 L742,68 L750,78 L755,88 L752,100 L748,110 L740,118 L730,125 L718,128 L705,130 L692,128 L680,122 L670,115 L662,105 L658,95 L655,85 L658,75 L662,68 Z",
+  // Japan
+  japan: "M772,72 L778,68 L785,72 L788,80 L785,90 L780,98 L775,105 L770,100 L768,92 L770,82 Z",
+  // Indonesia / Maritime SE Asia
+  indonesia: "M700,210 L715,205 L730,208 L745,212 L758,215 L770,218 L780,222 L772,228 L760,230 L748,228 L735,225 L722,222 L710,218 L702,215 Z",
+  // Australia
+  australia: "M735,290 L755,280 L775,278 L795,282 L812,288 L828,295 L838,305 L842,318 L838,332 L830,342 L818,350 L805,355 L790,358 L775,355 L760,350 L748,342 L738,332 L732,318 L730,305 L732,295 Z",
+  // New Zealand
+  newZealand: "M862,340 L868,335 L872,342 L870,352 L865,360 L858,355 L855,348 Z",
+};
+
+/** Convert lat/long to x/y on a 1000×500 equirectangular projection */
+function geoToXY(lat: number, lon: number): { x: number; y: number } {
+  const x = ((lon + 180) / 360) * 1000;
+  const y = ((90 - lat) / 180) * 500;
+  return { x, y };
+}
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'chat', label: 'Chatbot', icon: MessageSquare },
@@ -129,218 +213,351 @@ const Sidebar = ({ activeTab, setActiveTab }: { activeTab: TabId; setActiveTab: 
   );
 };
 
-// 2. DASHBOARD COMPONENT
+// 2. DASHBOARD COMPONENT (fully functional – fetches real data from API)
 const Dashboard = () => {
-  const [threats, setThreats] = useState(127);
-  const [blocked, setBlocked] = useState(3421);
+  const [logs, setLogs] = useState<AttackLog[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [expandedAlert, setExpandedAlert] = useState<number | null>(null);
+  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setThreats(t => t + Math.floor(Math.random() * 3));
-      setBlocked(b => b + Math.floor(Math.random() * 5));
-    }, 3000);
-    return () => clearInterval(interval);
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await fetch('/api/attack-logs');
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      const data: AttackLog[] = await res.json();
+      setLogs(data);
+      setLastRefresh(new Date());
+    } catch (err) {
+      console.error('Failed to fetch attack logs', err);
+      setError('Unable to connect to threat database');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
+  useEffect(() => {
+    fetchData();
+    const interval = setInterval(fetchData, 30000);
+    return () => clearInterval(interval);
+  }, [fetchData]);
+
+  // derived analytics
+  const totalThreats = logs.length;
+  const totalBlocked = logs.length;
+  const highSeverity = logs.filter(l => l.severity >= 7);
+  const medSeverity = logs.filter(l => l.severity >= 4 && l.severity < 7);
+  const lowSeverity = logs.filter(l => l.severity < 4);
+
+  const chartData = useMemo(() => {
+    const map: Record<string, number> = {};
+    logs.forEach(l => {
+      const key = l.type.replace('SHIELD:', '').replace(/_/g, ' ');
+      map[key] = (map[key] || 0) + 1;
+    });
+    return Object.entries(map).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count).slice(0, 8);
+  }, [logs]);
+
+  const timelineData = useMemo(() => {
+    const buckets: Record<string, { high: number; med: number; low: number }> = {};
+    logs.forEach(l => {
+      const d = new Date(l.timestamp);
+      const key = `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:00`;
+      if (!buckets[key]) buckets[key] = { high: 0, med: 0, low: 0 };
+      if (l.severity >= 7) buckets[key].high++;
+      else if (l.severity >= 4) buckets[key].med++;
+      else buckets[key].low++;
+    });
+    return Object.entries(buckets).sort(([a], [b]) => a.localeCompare(b)).slice(-15).map(([time, v]) => ({ time: time.split(' ')[1] || time, ...v }));
+  }, [logs]);
+
+  const pieData = useMemo(() => [
+    { name: 'Critical', value: highSeverity.length, color: '#ef4444' },
+    { name: 'Medium', value: medSeverity.length, color: '#f59e0b' },
+    { name: 'Low', value: lowSeverity.length, color: '#10b981' },
+  ], [highSeverity, medSeverity, lowSeverity]);
+
+  const geoPoints = useMemo(() => {
+    return logs.filter(l => l.latitude && l.longitude).map(l => ({
+      ...l,
+      pos: geoToXY(parseFloat(l.latitude!), parseFloat(l.longitude!)),
+    }));
+  }, [logs]);
+
+  const activeAlerts = useMemo(() => {
+    const seen = new Set<string>();
+    return logs.filter(l => l.severity >= 5).filter(l => { const k = l.type; if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 5);
+  }, [logs]);
+
+  const uniqueCountries = useMemo(() => {
+    const s = new Set(logs.map(l => l.country).filter(Boolean));
+    return s.size;
+  }, [logs]);
+
+  if (loading && logs.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-[60vh]">
+        <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}>
+          <RefreshCw className="text-blue-400" size={32} />
+        </motion.div>
+        <span className="ml-3 text-slate-400">Loading threat intelligence…</span>
+      </div>
+    );
+  }
+
+  if (error && logs.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[60vh] text-center">
+        <AlertTriangle className="text-amber-500 mb-4" size={48} />
+        <p className="text-slate-300 text-lg font-semibold mb-2">Threat Database Unavailable</p>
+        <p className="text-slate-500 text-sm mb-4">{error}</p>
+        <button onClick={fetchData} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-500 transition-colors">Retry</button>
+      </div>
+    );
+  }
+
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-    >
-      {/* Status Cards */}
-      <motion.div 
-        whileHover={{ y: -4, boxShadow: '0 20px 40px -15px rgba(59, 130, 246, 0.3)' }}
-        className="bg-slate-900/80 backdrop-blur border border-slate-800 p-6 rounded-2xl relative overflow-hidden group"
-      >
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+      {/* Card 1: System Status */}
+      <motion.div whileHover={{ y: -4, boxShadow: '0 20px 40px -15px rgba(59, 130, 246, 0.3)' }} className="bg-slate-900/80 backdrop-blur border border-slate-800 p-6 rounded-2xl relative overflow-hidden group">
         <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl group-hover:bg-blue-500/20 transition-all" />
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-slate-400 text-xs uppercase tracking-wider font-semibold">Chatbot Service</h3>
-          <motion.div 
-            animate={{ rotate: 360 }}
-            transition={{ duration: 8, repeat: Infinity, ease: 'linear' }}
-          >
-            <Server className="text-blue-500" size={20} />
-          </motion.div>
+          <h3 className="text-slate-400 text-xs uppercase tracking-wider font-semibold">System Status</h3>
+          <motion.div animate={{ rotate: 360 }} transition={{ duration: 8, repeat: Infinity, ease: 'linear' }}><Server className="text-blue-500" size={20} /></motion.div>
         </div>
-        <p className="text-3xl font-bold text-blue-400 mb-1">Running</p>
-        <p className="text-xs text-slate-500">Arcjet Shield: Active</p>
+        <p className="text-3xl font-bold text-blue-400 mb-1">{error ? 'Degraded' : 'Running'}</p>
+        <p className="text-xs text-slate-500">Arcjet Shield: {error ? 'Check' : 'Active'}</p>
         <div className="mt-4 flex items-center gap-2">
-          <span className="flex items-center gap-1 text-xs text-emerald-400">
-            <Zap size={12} /> 99.9% Uptime
-          </span>
+          <span className="flex items-center gap-1 text-xs text-emerald-400"><Zap size={12} /> {totalBlocked} attacks blocked</span>
         </div>
       </motion.div>
 
-      <motion.div 
-        whileHover={{ y: -4, boxShadow: '0 20px 40px -15px rgba(16, 185, 129, 0.3)' }}
-        className="bg-slate-900/80 backdrop-blur border border-slate-800 p-6 rounded-2xl relative overflow-hidden group"
-      >
+      {/* Card 2: Database */}
+      <motion.div whileHover={{ y: -4, boxShadow: '0 20px 40px -15px rgba(16, 185, 129, 0.3)' }} className="bg-slate-900/80 backdrop-blur border border-slate-800 p-6 rounded-2xl relative overflow-hidden group">
         <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl group-hover:bg-emerald-500/20 transition-all" />
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-slate-400 text-xs uppercase tracking-wider font-semibold">Database Integrity</h3>
           <Lock className="text-emerald-400" size={20} />
         </div>
-        <p className="text-3xl font-bold text-emerald-400 mb-1">Perfect</p>
-        <p className="text-xs text-slate-500">Last backup: 2 min ago</p>
-        <button className="mt-4 text-xs text-blue-400 hover:text-blue-300 underline underline-offset-2 transition-colors">
-          View changes
-        </button>
+        <p className="text-3xl font-bold text-emerald-400 mb-1">Protected</p>
+        <p className="text-xs text-slate-500">Drizzle ORM: Active</p>
+        <div className="mt-4 flex items-center gap-2">
+          <span className="flex items-center gap-1 text-xs text-emerald-400"><ShieldCheck size={12} /> Zero raw SQL</span>
+        </div>
       </motion.div>
 
-      <motion.div 
-        whileHover={{ y: -4, boxShadow: '0 20px 40px -15px rgba(245, 158, 11, 0.3)' }}
-        className="bg-slate-900/80 backdrop-blur border border-slate-800 p-6 rounded-2xl relative overflow-hidden group border-l-4 border-l-amber-500"
-      >
+      {/* Card 3: Active Alerts with recommendations */}
+      <motion.div whileHover={{ y: -4, boxShadow: '0 20px 40px -15px rgba(245, 158, 11, 0.3)' }} className="bg-slate-900/80 backdrop-blur border border-slate-800 p-6 rounded-2xl relative overflow-hidden group border-l-4 border-l-amber-500">
         <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-3xl group-hover:bg-amber-500/20 transition-all" />
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-slate-400 text-xs uppercase tracking-wider font-semibold">Active Alerts</h3>
           <AlertTriangle className="text-amber-500" size={20} />
         </div>
-        <div className="flex items-start gap-2 text-amber-500 mb-4">
-          <AlertTriangle size={18} className="flex-shrink-0 mt-0.5" />
-          <p className="text-sm">Suspicious IP Rotation detected</p>
-        </div>
-        <motion.button 
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          className="w-full bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-400 py-2.5 rounded-lg text-xs font-bold border border-amber-500/30 hover:border-amber-500/50 transition-all"
-        >
-          Recommended Action
-        </motion.button>
+        <p className="text-3xl font-bold text-amber-400 mb-1">{activeAlerts.length}</p>
+        <p className="text-xs text-slate-500 mb-3">Unique threat types requiring attention</p>
+        {activeAlerts.length > 0 && (() => {
+          const latest = activeAlerts[0];
+          const rec = getRecommendation(latest.type);
+          return (
+            <>
+              <div className="flex items-start gap-2 text-amber-500 mb-3">
+                <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
+                <p className="text-xs leading-snug">Latest: <strong>{latest.type}</strong> from {latest.ip} ({latest.country || 'Unknown'})</p>
+              </div>
+              <div className={`mb-2 px-3 py-2 rounded-lg text-xs ${rec.urgency === 'critical' ? 'bg-red-500/10 border border-red-500/30 text-red-400' : rec.urgency === 'high' ? 'bg-amber-500/10 border border-amber-500/30 text-amber-400' : 'bg-blue-500/10 border border-blue-500/30 text-blue-400'}`}>
+                <div className="flex items-center gap-1.5 font-bold mb-1"><rec.icon size={12} /> {rec.action}</div>
+                <p className="text-[10px] opacity-80 leading-relaxed">{rec.detail}</p>
+              </div>
+            </>
+          );
+        })()}
       </motion.div>
 
-      {/* Stats Row */}
-      <motion.div 
-        whileHover={{ y: -4 }}
-        className="lg:col-span-2 bg-slate-900/80 backdrop-blur border border-slate-800 p-6 rounded-2xl"
-      >
+      {/* Threat Activity Area Chart */}
+      <motion.div whileHover={{ y: -4 }} className="lg:col-span-2 bg-slate-900/80 backdrop-blur border border-slate-800 p-6 rounded-2xl">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-slate-400 text-xs uppercase tracking-wider font-semibold">Threat Activity</h3>
+          <h3 className="text-slate-400 text-xs uppercase tracking-wider font-semibold">Threat Activity Over Time</h3>
           <div className="flex items-center gap-2">
+            <button onClick={fetchData} className="text-slate-500 hover:text-slate-300 transition-colors" title="Refresh"><RefreshCw size={14} className={loading ? 'animate-spin' : ''} /></button>
             <span className="text-xs text-slate-500">Live</span>
-            <motion.div 
-              className="w-2 h-2 rounded-full bg-red-500"
-              animate={{ opacity: [1, 0.3, 1] }}
-              transition={{ duration: 1, repeat: Infinity }}
-            />
+            <motion.div className="w-2 h-2 rounded-full bg-red-500" animate={{ opacity: [1, 0.3, 1] }} transition={{ duration: 1, repeat: Infinity }} />
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-6">
-          <div>
-            <p className="text-3xl font-bold text-slate-100">{threats.toLocaleString()}</p>
-            <p className="text-xs text-slate-500 mt-1">Threats Detected</p>
-          </div>
-          <div>
-            <p className="text-3xl font-bold text-emerald-400">{blocked.toLocaleString()}</p>
-            <p className="text-xs text-slate-500 mt-1">Attacks Blocked</p>
-          </div>
-          <div>
-            <p className="text-3xl font-bold text-blue-400">0.003s</p>
-            <p className="text-xs text-slate-500 mt-1">Avg Response Time</p>
-          </div>
+        <div className="grid grid-cols-3 gap-6 mb-6">
+          <div><p className="text-3xl font-bold text-slate-100">{totalThreats.toLocaleString()}</p><p className="text-xs text-slate-500 mt-1">Threats Detected</p></div>
+          <div><p className="text-3xl font-bold text-emerald-400">{totalBlocked.toLocaleString()}</p><p className="text-xs text-slate-500 mt-1">Attacks Blocked</p></div>
+          <div><p className="text-3xl font-bold text-red-400">{highSeverity.length}</p><p className="text-xs text-slate-500 mt-1">Critical Severity</p></div>
         </div>
-        <div className="mt-6 h-24 flex items-end gap-1">
-          {[40, 65, 45, 80, 55, 90, 70, 85, 60, 75, 50, 95, 70, 80, 65].map((h, i) => (
-            <motion.div
-              key={i}
-              initial={{ height: 0 }}
-              animate={{ height: `${h}%` }}
-              transition={{ delay: i * 0.05, duration: 0.5 }}
-              className="flex-1 bg-gradient-to-t from-blue-600/50 to-blue-400/50 rounded-t hover:from-blue-500 hover:to-blue-300 transition-all cursor-pointer"
-            />
-          ))}
+        <div className="h-40">
+          {timelineData.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={timelineData}>
+                <defs>
+                  <linearGradient id="gHigh" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#ef4444" stopOpacity={0.4} /><stop offset="95%" stopColor="#ef4444" stopOpacity={0} /></linearGradient>
+                  <linearGradient id="gMed" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#f59e0b" stopOpacity={0.4} /><stop offset="95%" stopColor="#f59e0b" stopOpacity={0} /></linearGradient>
+                  <linearGradient id="gLow" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#10b981" stopOpacity={0.4} /><stop offset="95%" stopColor="#10b981" stopOpacity={0} /></linearGradient>
+                </defs>
+                <XAxis dataKey="time" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} width={30} />
+                <RechartsTooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px', fontSize: '11px' }} labelStyle={{ color: '#94a3b8' }} />
+                <Area type="monotone" dataKey="high" stackId="1" stroke="#ef4444" fill="url(#gHigh)" name="Critical" />
+                <Area type="monotone" dataKey="med" stackId="1" stroke="#f59e0b" fill="url(#gMed)" name="Medium" />
+                <Area type="monotone" dataKey="low" stackId="1" stroke="#10b981" fill="url(#gLow)" name="Low" />
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-full text-slate-600 text-sm">No timeline data available</div>
+          )}
         </div>
       </motion.div>
 
-      {/* Live Attack Logs */}
-      <motion.div 
-        whileHover={{ y: -4 }}
-        className="bg-slate-900/80 backdrop-blur border border-slate-800 p-6 rounded-2xl overflow-hidden"
-      >
+      {/* Attack Type Bar Chart + Pie */}
+      <motion.div whileHover={{ y: -4 }} className="bg-slate-900/80 backdrop-blur border border-slate-800 p-6 rounded-2xl overflow-hidden">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-slate-400 text-xs uppercase tracking-wider font-semibold">Live Attack Logs</h3>
+          <h3 className="text-slate-400 text-xs uppercase tracking-wider font-semibold">Attack Types</h3>
           <BarChart3 className="text-slate-600" size={16} />
         </div>
-        <div className="space-y-3 max-h-48 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
-          {ATTACK_LOGS.map((log, i) => (
-            <motion.div 
-              key={i}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: i * 0.1 }}
-              className="flex items-center justify-between p-2 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition-colors"
-            >
-              <div>
-                <span className={`text-xs font-mono ${log.severity >= 7 ? 'text-red-400' : log.severity >= 4 ? 'text-amber-400' : 'text-slate-400'}`}>
-                  {log.ip}
-                </span>
-                <p className="text-[10px] text-slate-500">{log.type}</p>
+        <div className="h-44 mb-4">
+          {chartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} layout="vertical" margin={{ left: 0 }}>
+                <XAxis type="number" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 9, fill: '#94a3b8' }} width={90} axisLine={false} tickLine={false} />
+                <RechartsTooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px', fontSize: '11px' }} />
+                <Bar dataKey="count" fill="#3b82f6" radius={[0, 4, 4, 0]} name="Attacks" />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-full text-slate-600 text-sm">No data</div>
+          )}
+        </div>
+        <div className="flex items-center justify-around">
+          <div className="w-20 h-20">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart><Pie data={pieData} innerRadius={22} outerRadius={36} dataKey="value" stroke="none">{pieData.map((entry, idx) => (<Cell key={idx} fill={entry.color} />))}</Pie></PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="space-y-1">
+            {pieData.map(p => (<div key={p.name} className="flex items-center gap-2 text-[10px]"><span className="w-2 h-2 rounded-full" style={{ background: p.color }} /><span className="text-slate-400">{p.name}: {p.value}</span></div>))}
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Live Attack Logs (real data) */}
+      <motion.div whileHover={{ y: -4 }} className="lg:col-span-2 bg-slate-900/80 backdrop-blur border border-slate-800 p-6 rounded-2xl overflow-hidden">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-slate-400 text-xs uppercase tracking-wider font-semibold">Live Attack Logs</h3>
+          <span className="text-[10px] text-slate-600">{logs.length} records</span>
+        </div>
+        <div className="space-y-2 max-h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+          {logs.slice(0, 15).map((log, i) => (
+            <motion.div key={log.id || i} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.04 }} className="flex items-center justify-between p-2 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition-colors">
+              <div className="min-w-0">
+                <span className={`text-xs font-mono ${log.severity >= 7 ? 'text-red-400' : log.severity >= 4 ? 'text-amber-400' : 'text-slate-400'}`}>{log.ip}</span>
+                <p className="text-[10px] text-slate-500 truncate">{log.type}</p>
               </div>
-              <div className="text-right">
-                <span className={`text-[10px] px-2 py-0.5 rounded-full ${log.severity >= 7 ? 'bg-red-500/20 text-red-400' : log.severity >= 4 ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-700 text-slate-400'}`}>
-                  {log.severity}/10
-                </span>
-                <p className="text-[10px] text-slate-500 mt-1">{log.timestamp}</p>
+              <div className="flex items-center gap-3">
+                {log.country && (<span className="text-[10px] text-slate-500 hidden sm:inline">{log.city ? `${log.city}, ` : ''}{log.country}</span>)}
+                <span className={`text-[10px] px-2 py-0.5 rounded-full whitespace-nowrap ${log.severity >= 7 ? 'bg-red-500/20 text-red-400' : log.severity >= 4 ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-700 text-slate-400'}`}>{log.severity}/10</span>
+                <p className="text-[10px] text-slate-500 whitespace-nowrap">{timeAgo(log.timestamp)}</p>
               </div>
             </motion.div>
           ))}
+          {logs.length === 0 && (<p className="text-center text-slate-600 text-sm py-6">No attack logs recorded yet</p>)}
         </div>
       </motion.div>
 
-      {/* Threat Map */}
-      <motion.div 
-        whileHover={{ y: -4 }}
-        className="lg:col-span-3 bg-slate-900/80 backdrop-blur border border-slate-800 p-6 rounded-2xl h-80 relative overflow-hidden"
-      >
+      {/* Security Recommendations Panel */}
+      <motion.div whileHover={{ y: -4 }} className="bg-slate-900/80 backdrop-blur border border-slate-800 p-6 rounded-2xl overflow-hidden">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-slate-400 text-xs uppercase tracking-wider font-semibold">Recommended Actions</h3>
+          <ShieldAlert className="text-blue-400" size={16} />
+        </div>
+        <div className="space-y-3 max-h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+          {activeAlerts.map((alert, i) => {
+            const rec = getRecommendation(alert.type);
+            const isOpen = expandedAlert === i;
+            return (
+              <motion.div key={i} layout className="rounded-lg overflow-hidden">
+                <button onClick={() => setExpandedAlert(isOpen ? null : i)} className={`w-full text-left p-3 rounded-lg transition-all ${rec.urgency === 'critical' ? 'bg-red-500/10 border border-red-500/20 hover:border-red-500/40' : rec.urgency === 'high' ? 'bg-amber-500/10 border border-amber-500/20 hover:border-amber-500/40' : 'bg-blue-500/10 border border-blue-500/20 hover:border-blue-500/40'}`}>
+                  <div className="flex items-center gap-2">
+                    <rec.icon size={14} className={rec.urgency === 'critical' ? 'text-red-400' : rec.urgency === 'high' ? 'text-amber-400' : 'text-blue-400'} />
+                    <span className="text-xs font-bold text-slate-200">{rec.action}</span>
+                    <span className={`ml-auto text-[9px] uppercase font-bold px-1.5 py-0.5 rounded ${rec.urgency === 'critical' ? 'bg-red-500/20 text-red-400' : rec.urgency === 'high' ? 'bg-amber-500/20 text-amber-400' : 'bg-blue-500/20 text-blue-400'}`}>{rec.urgency}</span>
+                  </div>
+                  <AnimatePresence>
+                    {isOpen && (
+                      <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="mt-2 text-[10px] text-slate-400 leading-relaxed">
+                        <p className="text-[10px] text-slate-500 mb-1">Triggered by: {alert.type} — {alert.ip}</p>
+                        <p>{rec.detail}</p>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </button>
+              </motion.div>
+            );
+          })}
+          {activeAlerts.length === 0 && (
+            <div className="text-center py-6"><CheckCircle className="text-emerald-400 mx-auto mb-2" size={24} /><p className="text-xs text-slate-500">No active threats – all clear!</p></div>
+          )}
+        </div>
+      </motion.div>
+
+      {/* Global Threat Map with SVG world map */}
+      <motion.div whileHover={{ y: -4 }} className="lg:col-span-3 bg-slate-900/80 backdrop-blur border border-slate-800 p-6 rounded-2xl relative overflow-hidden" style={{ minHeight: 340 }}>
         <div className="flex items-center justify-between mb-4 relative z-10">
           <h3 className="text-slate-400 text-xs uppercase tracking-wider font-semibold">Global Threat Map</h3>
           <div className="flex items-center gap-4">
-            <span className="flex items-center gap-2 text-xs text-slate-500">
-              <span className="w-2 h-2 rounded-full bg-red-500" /> High Risk
-            </span>
-            <span className="flex items-center gap-2 text-xs text-slate-500">
-              <span className="w-2 h-2 rounded-full bg-amber-500" /> Medium
-            </span>
-            <span className="flex items-center gap-2 text-xs text-slate-500">
-              <span className="w-2 h-2 rounded-full bg-emerald-500" /> Low
-            </span>
+            <span className="flex items-center gap-2 text-xs text-slate-500"><span className="w-2 h-2 rounded-full bg-red-500" /> High Risk</span>
+            <span className="flex items-center gap-2 text-xs text-slate-500"><span className="w-2 h-2 rounded-full bg-amber-500" /> Medium</span>
+            <span className="flex items-center gap-2 text-xs text-slate-500"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Low</span>
           </div>
         </div>
-        <div className="absolute inset-0 flex items-center justify-center">
-          <Map className="text-slate-800/50" size={300} />
-          {[...Array(8)].map((_, i) => (
-            <motion.div
-              key={i}
-              className="absolute w-3 h-3 rounded-full"
-              style={{
-                background: i % 3 === 0 ? '#ef4444' : i % 3 === 1 ? '#f59e0b' : '#10b981',
-                left: `${15 + Math.random() * 70}%`,
-                top: `${15 + Math.random() * 70}%`,
-              }}
-              animate={{
-                scale: [1, 1.5, 1],
-                opacity: [0.7, 1, 0.7],
-              }}
-              transition={{
-                duration: 2 + Math.random(),
-                repeat: Infinity,
-                delay: i * 0.3,
-              }}
-            >
-              <motion.div
-                className="absolute inset-0 rounded-full"
-                style={{ background: 'inherit' }}
-                animate={{ scale: [1, 3], opacity: [0.5, 0] }}
-                transition={{ duration: 1.5, repeat: Infinity }}
-              />
-            </motion.div>
-          ))}
+        <div className="relative w-full" style={{ paddingBottom: '50%' }}>
+          <svg viewBox="0 0 1000 500" className="absolute inset-0 w-full h-full" xmlns="http://www.w3.org/2000/svg">
+            {/* Ocean background */}
+            <rect width="1000" height="500" fill="#0c1425" rx="8" />
+            {/* Grid lines */}
+            {[...Array(9)].map((_, i) => (<line key={`h${i}`} x1={0} y1={(i + 1) * 50} x2={1000} y2={(i + 1) * 50} stroke="#1e293b" strokeWidth="0.5" opacity="0.4" />))}
+            {[...Array(19)].map((_, i) => (<line key={`v${i}`} x1={(i + 1) * 50} y1={0} x2={(i + 1) * 50} y2={500} stroke="#1e293b" strokeWidth="0.5" opacity="0.4" />))}
+            {/* Equator */}
+            <line x1={0} y1={250} x2={1000} y2={250} stroke="#334155" strokeWidth="0.5" strokeDasharray="8,4" opacity="0.5" />
+            {/* Continent outlines */}
+            {Object.entries(MAP_PATHS).map(([name, d]) => (
+              <path key={name} d={d} fill="#1e293b" stroke="#475569" strokeWidth="1" strokeLinejoin="round" />
+            ))}
+            {/* Attack points plotted by lat/long */}
+            {geoPoints.map((pt, i) => {
+              const color = pt.severity >= 7 ? '#ef4444' : pt.severity >= 4 ? '#f59e0b' : '#10b981';
+              return (
+                <g key={i}>
+                  <circle cx={pt.pos.x} cy={pt.pos.y} r="12" fill="none" stroke={color} strokeWidth="1" opacity="0.3">
+                    <animate attributeName="r" from="6" to="20" dur="2s" repeatCount="indefinite" />
+                    <animate attributeName="opacity" from="0.5" to="0" dur="2s" repeatCount="indefinite" />
+                  </circle>
+                  <circle cx={pt.pos.x} cy={pt.pos.y} r="5" fill={color} opacity="0.85">
+                    <title>{`${pt.type} — ${pt.ip} (${pt.city || ''}, ${pt.country || 'Unknown'}) — Severity: ${pt.severity}/10`}</title>
+                  </circle>
+                </g>
+              );
+            })}
+            {geoPoints.length === 0 && (
+              <>
+                <circle cx={150} cy={140} r="5" fill="#f59e0b" opacity="0.6" />
+                <circle cx={490} cy={80} r="5" fill="#ef4444" opacity="0.6" />
+                <circle cx={720} cy={110} r="5" fill="#ef4444" opacity="0.6" />
+                <circle cx={790} cy={310} r="5" fill="#10b981" opacity="0.6" />
+                <text x={500} y={260} textAnchor="middle" fill="#475569" fontSize="14">No geo-located attacks</text>
+              </>
+            )}
+          </svg>
         </div>
-        <div className="absolute bottom-4 left-4 right-4 flex justify-between text-xs text-slate-500">
-          <span>Monitoring 247 regions</span>
-          <span>Last update: Just now</span>
+        <div className="flex justify-between text-xs text-slate-500 mt-2">
+          <span>Monitoring {uniqueCountries} countries • {geoPoints.length} geo-located threats</span>
+          <span>Last update: {lastRefresh.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
         </div>
       </motion.div>
     </motion.div>
