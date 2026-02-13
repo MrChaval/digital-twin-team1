@@ -411,7 +411,11 @@ const Dashboard = () => {
               const y = (1 - mercatorY / Math.PI) * 50;
               
               const color = log.severity >= 7 ? '#ef4444' : log.severity >= 4 ? '#f59e0b' : '#10b981';
-              const isLocalhost = log.ip === '::1' || log.ip === '127.0.0.1';
+              
+              // Check if we're in development (localhost) - only show Demo label there
+              // In production (Vercel), this will be false, so no Demo label ever appears
+              const isDevelopment = typeof window !== 'undefined' && 
+                                   (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
               
               // Log marker placement for verification
               if (log.country === 'Philippines') {
@@ -467,7 +471,7 @@ const Dashboard = () => {
                       <p className="text-white font-semibold">{log.type}</p>
                       <p className="text-slate-400">
                         {log.city || 'Unknown'}, {log.country || 'Unknown'}
-                        {isLocalhost && <span className="ml-1 text-yellow-500">(Demo)</span>}
+                        {isDevelopment && <span className="ml-1 text-yellow-500">(Demo)</span>}
                       </p>
                       <p className="text-slate-500">IP: {log.ip === '::1' ? 'localhost' : log.ip}</p>
                       <p className="text-slate-500">Severity: {log.severity}/10</p>
