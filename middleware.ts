@@ -153,8 +153,28 @@ export default clerkMiddleware(async (auth, req) => {
     requested: 1, // Request 1 token per request
   });
 
-  // Check if rate limited - return HTML error page
+  // Check if rate limited - log to database and return HTML error page
   if (decision.isDenied() && decision.reason.isRateLimit()) {
+    // Log rate limit violation to database (don't await - fire and forget)
+    (async () => {
+      try {
+        const geoResponse = await fetch(`https://freegeoip.app/json/${decision.ip.address}`);
+        const geoData = await geoResponse.json();
+        
+        await db.insert(attackLogs).values({
+          ip: decision.ip.address,
+          severity: 6, // Rate limit severity
+          type: "RATE_LIMIT",
+          city: geoData.city,
+          country: geoData.country_name,
+          latitude: geoData.latitude?.toString(),
+          longitude: geoData.longitude?.toString(),
+        });
+      } catch (err) {
+        console.error("Failed to log rate limit attack:", err);
+      }
+    })();
+
     return new NextResponse(
       `<!DOCTYPE html>
 <html lang="en">
