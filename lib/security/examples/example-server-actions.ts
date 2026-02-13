@@ -14,7 +14,7 @@
 
 "use server";
 
-import { db, projects } from "@/lib/db";
+import { db, projects, users } from "@/lib/db";
 import { isAdmin, getCurrentUser } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
@@ -69,6 +69,7 @@ async function createProject_AFTER(data: any) {
   try {
     // ✅ Revalidate session (checks user still exists, still admin)
     const { user } = await requireAdminSession();
+    if (!user) throw new Error("User not found");
     
     // ✅ Get request metadata for audit log
     const { ipAddress, userAgent } = await getRequestAuditMetadata();
@@ -78,7 +79,7 @@ async function createProject_AFTER(data: any) {
 
     // ✅ Log successful action
     await logSuccess({
-      userId: user.id,
+      userId: user.id.toString(),
       userEmail: user.email,
       action: "CREATE_PROJECT",
       resource: "projects",
@@ -147,6 +148,7 @@ async function deleteProject_AFTER(projectId: number) {
       maxAgeMinutes: 10,
       reason: "delete a project",
     });
+    if (!user) throw new Error("User not found");
 
     const { ipAddress, userAgent } = await getRequestAuditMetadata();
 
@@ -158,7 +160,7 @@ async function deleteProject_AFTER(projectId: number) {
 
     if (!projectToDelete) {
       await logFailure({
-        userId: user.id,
+        userId: user.id.toString(),
         userEmail: user.email,
         action: "DELETE_PROJECT",
         resource: "projects",
@@ -179,7 +181,7 @@ async function deleteProject_AFTER(projectId: number) {
 
     // ✅ Log deletion with full context
     await logSuccess({
-      userId: user.id,
+      userId: user.id.toString(),
       userEmail: user.email,
       action: "DELETE_PROJECT",
       resource: "projects",
@@ -290,6 +292,13 @@ async function setUserRole_AFTER(email: string, role: "admin" | "user") {
       reason: "change user roles",
     });
 
+    if (!adminUser) {
+      return {
+        success: false,
+        error: { message: "Unauthorized", code: "AUTH_001" },
+      };
+    }
+
     const { ipAddress, userAgent } = await getRequestAuditMetadata();
 
     // ✅ Check if target user exists
@@ -300,7 +309,7 @@ async function setUserRole_AFTER(email: string, role: "admin" | "user") {
 
     if (!targetUser) {
       await logFailure({
-        userId: adminUser.id,
+        userId: adminUser.id.toString(),
         userEmail: adminUser.email,
         action: "UPDATE_USER_ROLE",
         resource: "users",
@@ -324,7 +333,7 @@ async function setUserRole_AFTER(email: string, role: "admin" | "user") {
 
     // ✅ Log role change with full context
     await logSuccess({
-      userId: adminUser.id,
+      userId: adminUser.id.toString(),
       userEmail: adminUser.email,
       action: "UPDATE_USER_ROLE",
       resource: "users",

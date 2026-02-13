@@ -65,6 +65,16 @@ export async function updateProject(
     // - Session hasn't been revoked
     const { user } = await requireAdminSession();
 
+    if (!user) {
+      return {
+        success: false,
+        error: {
+          message: "Unauthorized. Admin privileges required.",
+          code: "AUTH_001",
+        },
+      };
+    }
+
     // Get request metadata for audit logging
     const { ipAddress, userAgent } = await getRequestAuditMetadata();
 
@@ -82,11 +92,11 @@ export async function updateProject(
     if (!existingProject) {
       // Log failed attempt (project not found)
       await logFailure({
-        userId: user.id,
+        userId: user.id.toString(),
         userEmail: user.email,
         action: "UPDATE_PROJECT",
         resource: "projects",
-        resourceId: projectId,
+        resourceId: projectId.toString(),
         metadata: {
           reason: "Project not found",
           attemptedUpdate: data,
@@ -124,11 +134,11 @@ export async function updateProject(
 
     // Log with full context - helps with forensics and debugging
     await logSuccess({
-      userId: user.id,
+      userId: user.id.toString(),
       userEmail: user.email,
       action: "UPDATE_PROJECT",
       resource: "projects",
-      resourceId: projectId,
+      resourceId: projectId.toString(),
       metadata: {
         // Log what changed
         changes: data,
@@ -176,11 +186,11 @@ export async function updateProject(
       const { ipAddress, userAgent } = await getRequestAuditMetadata();
 
       await logDenied({
-        userId: currentUser?.id,
+        userId: currentUser?.id.toString(),
         userEmail: currentUser?.email || "unknown",
         action: "UPDATE_PROJECT",
         resource: "projects",
-        resourceId: projectId,
+        resourceId: projectId.toString(),
         metadata: {
           reason: error.message,
           attemptedUpdate: data,
