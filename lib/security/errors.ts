@@ -9,9 +9,9 @@
  * - Clients get generic messages ("An error occurred")
  * - Server logs get full details (stack traces, database errors, etc.)
  * - Error codes help with debugging without exposing internals
+ * 
+ * NOTE: This is a utility library - do NOT add "use server" directive
  */
-
-"use server";
 
 import { logFailure } from "./audit";
 import { getPublicMessage, getInternalDescription } from "./error-codes";

@@ -6,9 +6,8 @@
  * Purpose: Integrate with external monitoring services (Sentry, LogRocket, etc.)
  * 
  * NOTE: This is a template - configure with your actual monitoring service
+ * NOTE: This is a utility library - do NOT add "use server" directive
  */
-
-"use server";
 
 import { logFailure } from "./audit";
 import { ErrorMonitoringPayload, ErrorSeverity, ErrorCategory } from "./types";

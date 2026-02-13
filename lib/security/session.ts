@@ -10,9 +10,9 @@
  * - User role can change in YOUR database while Clerk session is still valid
  * - User can be deleted from YOUR database but Clerk session persists
  * - Sensitive operations should require recent authentication
+ * 
+ * NOTE: This is a utility library - do NOT add "use server" directive
  */
-
-"use server";
 
 import { currentUser } from "@clerk/nextjs/server";
 import { getCurrentUser, isAdmin } from "@/lib/auth";

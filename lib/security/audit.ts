@@ -7,9 +7,9 @@
  * 
  * IMPORTANT: This file requires database migration to be run first!
  * See: lib/security/migration-audit-logs.sql
+ * 
+ * NOTE: This is a utility library - do NOT add "use server" directive
  */
-
-"use server";
 
 import { db } from "@/lib/db";
 import { desc, eq, and, gte, lte, sql } from "drizzle-orm";
