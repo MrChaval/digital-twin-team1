@@ -12,6 +12,18 @@ CREATE TABLE "audit_logs" (
 	"created_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "attack_logs" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"ip" text NOT NULL,
+	"severity" integer NOT NULL,
+	"type" text NOT NULL,
+	"timestamp" timestamp DEFAULT now(),
+	"city" text,
+	"country" text,
+	"latitude" text,
+	"longitude" text
+);
+--> statement-breakpoint
 CREATE TABLE "blog_posts" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"title" text NOT NULL,

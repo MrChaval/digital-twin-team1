@@ -94,4 +94,15 @@ export const auditLogs = pgTable("audit_logs", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-// Contact submissions table removed as requested
+// Define the attack_logs table schema - for threat monitoring from Arcjet
+export const attackLogs = pgTable("attack_logs", {
+  id: serial("id").primaryKey(),
+  ip: text("ip").notNull(),
+  severity: integer("severity").notNull(), // 1-10 scale
+  type: text("type").notNull(), // "BOT", "RATE_LIMIT", "SHIELD:SQL_INJECTION", etc.
+  timestamp: timestamp("timestamp").defaultNow(),
+  city: text("city"),
+  country: text("country"),
+  latitude: text("latitude"),
+  longitude: text("longitude"),
+});
