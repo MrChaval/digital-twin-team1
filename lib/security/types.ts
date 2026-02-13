@@ -61,7 +61,7 @@ export type AuditStatus = "success" | "failed" | "denied";
  * Input for creating an audit log entry
  */
 export interface AuditLogInput {
-  userId?: number | null;
+  userId?: string | null;  // Changed from number to string to match audit_logs.userId (text/Clerk ID)
   userEmail: string;
   action: AuditAction;
   resource?: AuditResource;
