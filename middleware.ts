@@ -1,3 +1,4 @@
+import { db, attackLogs } from "./lib/db";
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import arcjet, { 
@@ -292,6 +293,45 @@ export default clerkMiddleware(async (auth, req) => {
 
   // Log security events for other denials
   if (decision.isDenied()) {
+    // We want to log the event to our database, but we don't want to block
+    // the response to the user.
+    const logPromise = (async () => {
+      try {
+        const type = decision.reason.toString();
+        // Default severity for all blocks is 5, but can be customized
+        let severity = 5;
+        if (decision.reason.isBot()) {
+          severity = 3; // Lower severity for generic bots
+        } else if (decision.reason.isRateLimit()) {
+          severity = 6; // Higher severity for rate limit breaches
+        } else if (type.includes("SQL")) {
+          severity = 9; // High severity for SQL Injection
+        } else if (type.includes("XSS")) {
+          severity = 8; // High severity for XSS
+        }
+        
+        // Fetch geolocation data
+        const geoResponse = await fetch(`https://freegeoip.app/json/${decision.ip.address}`);
+        const geoData = await geoResponse.json();
+        
+        // Log the attack to the database
+        await db.insert(attackLogs).values({
+          ip: decision.ip.address,
+          severity,
+          type,
+          city: geoData.city,
+          country: geoData.country_name,
+          latitude: geoData.latitude?.toString(),
+          longitude: geoData.longitude?.toString(),
+        });
+      } catch (err) {
+        console.error("Failed to log attack to database", err);
+      }
+    })();
+
+    // We don't await the promise, but we can catch errors on it
+    logPromise.catch(err => console.error("Error in logging promise:", err));
+
     console.warn("Arcjet blocked request:", {
       reason: decision.reason,
       ip: decision.ip,

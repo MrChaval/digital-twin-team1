@@ -28,21 +28,18 @@ interface Message {
 }
 
 interface AttackLog {
+  id: number;
   ip: string;
   severity: number;
-  timestamp: string;
   type: string;
+  timestamp: string;
+  city: string | null;
+  country: string | null;
+  latitude: string | null;
+  longitude: string | null;
 }
 
 // --- MOCK DATA ---
-const ATTACK_LOGS: AttackLog[] = [
-  { ip: '192.168.1.45', severity: 8, timestamp: '2 min ago', type: 'SQL Injection' },
-  { ip: '45.221.12.3', severity: 3, timestamp: '5 min ago', type: 'Port Scan' },
-  { ip: '103.45.67.89', severity: 6, timestamp: '12 min ago', type: 'Brute Force' },
-  { ip: '78.192.45.1', severity: 2, timestamp: '18 min ago', type: 'DDoS Attempt' },
-  { ip: '91.234.56.78', severity: 9, timestamp: '24 min ago', type: 'XSS Attack' },
-];
-
 const NAV_ITEMS: NavItem[] = [
   { id: 'chat', label: 'Chatbot', icon: MessageSquare },
   { id: 'dashboard', label: 'Analytics', icon: Activity },
@@ -131,15 +128,52 @@ const Sidebar = ({ activeTab, setActiveTab }: { activeTab: TabId; setActiveTab: 
 
 // 2. DASHBOARD COMPONENT
 const Dashboard = () => {
-  const [threats, setThreats] = useState(127);
-  const [blocked, setBlocked] = useState(3421);
+  const [threats, setThreats] = useState(0);
+  const [blocked, setBlocked] = useState(0);
+  const [attackLogs, setAttackLogs] = useState<AttackLog[]>([]);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setThreats(t => t + Math.floor(Math.random() * 3));
-      setBlocked(b => b + Math.floor(Math.random() * 5));
-    }, 3000);
-    return () => clearInterval(interval);
+    const fetchAttackLogs = async () => {
+      try {
+        const response = await fetch('/api/attack-logs');
+        if (response.ok) {
+          const data = await response.json();
+          if (Array.isArray(data)) {
+            setAttackLogs(data);
+          } else {
+            setAttackLogs([]);
+          }
+        } else {
+          setAttackLogs([]);
+        }
+      } catch (error) {
+        console.error("Failed to fetch attack logs:", error);
+        setAttackLogs([]);
+      }
+    };
+
+    const fetchThreatActivity = async () => {
+      try {
+        const response = await fetch('/api/threat-activity');
+        if (response.ok) {
+          const data = await response.json();
+          setThreats(data.threats);
+          setBlocked(data.blocked);
+        }
+      } catch (error) {
+        console.error("Failed to fetch threat activity:", error);
+      }
+    };
+
+    fetchAttackLogs();
+    fetchThreatActivity();
+    const attackLogsInterval = setInterval(fetchAttackLogs, 5000);
+    const threatActivityInterval = setInterval(fetchThreatActivity, 5000);
+
+    return () => {
+      clearInterval(attackLogsInterval);
+      clearInterval(threatActivityInterval);
+    };
   }, []);
 
   return (
@@ -264,9 +298,9 @@ const Dashboard = () => {
           <BarChart3 className="text-slate-600" size={16} />
         </div>
         <div className="space-y-3 max-h-48 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
-          {ATTACK_LOGS.map((log, i) => (
+          {attackLogs.map((log, i) => (
             <motion.div 
-              key={i}
+              key={log.id}
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: i * 0.1 }}
@@ -282,7 +316,7 @@ const Dashboard = () => {
                 <span className={`text-[10px] px-2 py-0.5 rounded-full ${log.severity >= 7 ? 'bg-red-500/20 text-red-400' : log.severity >= 4 ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-700 text-slate-400'}`}>
                   {log.severity}/10
                 </span>
-                <p className="text-[10px] text-slate-500 mt-1">{log.timestamp}</p>
+                <p className="text-[10px] text-slate-500 mt-1">{new Date(log.timestamp).toLocaleTimeString()}</p>
               </div>
             </motion.div>
           ))}
@@ -310,14 +344,14 @@ const Dashboard = () => {
         </div>
         <div className="absolute inset-0 flex items-center justify-center">
           <Map className="text-slate-800/50" size={300} />
-          {[...Array(8)].map((_, i) => (
+          {attackLogs.filter(log => log.latitude && log.longitude).map((log) => (
             <motion.div
-              key={i}
+              key={log.id}
               className="absolute w-3 h-3 rounded-full"
               style={{
-                background: i % 3 === 0 ? '#ef4444' : i % 3 === 1 ? '#f59e0b' : '#10b981',
-                left: `${15 + Math.random() * 70}%`,
-                top: `${15 + Math.random() * 70}%`,
+                background: log.severity >= 7 ? '#ef4444' : log.severity >= 4 ? '#f59e0b' : '#10b981',
+                left: `${(parseFloat(log.longitude!) + 180) / 360 * 100}%`,
+                top: `${(-parseFloat(log.latitude!) + 90) / 180 * 100}%`,
               }}
               animate={{
                 scale: [1, 1.5, 1],
@@ -326,7 +360,6 @@ const Dashboard = () => {
               transition={{
                 duration: 2 + Math.random(),
                 repeat: Infinity,
-                delay: i * 0.3,
               }}
             >
               <motion.div
@@ -339,7 +372,7 @@ const Dashboard = () => {
           ))}
         </div>
         <div className="absolute bottom-4 left-4 right-4 flex justify-between text-xs text-slate-500">
-          <span>Monitoring 247 regions</span>
+          <span>Monitoring {attackLogs.length} regions</span>
           <span>Last update: Just now</span>
         </div>
       </motion.div>

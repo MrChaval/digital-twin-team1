@@ -1,6 +1,6 @@
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
-import { boolean, pgTable, serial, text, timestamp, varchar, json } from "drizzle-orm/pg-core";
+import { boolean, pgTable, serial, text, timestamp, varchar, json, integer } from "drizzle-orm/pg-core";
 
 
 console.log("Initializing database connection...");
