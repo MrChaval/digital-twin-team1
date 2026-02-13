@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2000 1000">
+  <defs>
+    <!-- Grid pattern -->
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(71, 85, 105, 0.08)" stroke-width="0.5"/>
+    </pattern>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="2000" height="1000" fill="#0f172a" opacity="0.2"/>
+  
+  <!-- Grid overlay -->
+  <rect width="2000" height="1000" fill="url(#grid)"/>
+  
+  <!-- Coordinate reference lines -->
+  <g opacity="0.15">
+    <line x1="0" y1="250" x2="2000" y2="250" stroke="#475569" stroke-width="0.5" stroke-dasharray="5,5"/>
+    <line x1="0" y1="500" x2="2000" y2="500" stroke="#64748b" stroke-width="0.8"/>
+    <line x1="0" y1="750" x2="2000" y2="750" stroke="#475569" stroke-width="0.5" stroke-dasharray="5,5"/>
+    <line x1="500" y1="0" x2="500" y2="1000" stroke="#475569" stroke-width="0.5" stroke-dasharray="5,5"/>
+    <line x1="1000" y1="0" x2="1000" y2="1000" stroke="#64748b" stroke-width="0.8"/>
+    <line x1="1500" y1="0" x2="1500" y2="1000" stroke="#475569" stroke-width="0.5" stroke-dasharray="5,5"/>
+  </g>
+  
+  <!-- Abstract folded map icon in center -->
+  <g transform="translate(1000, 500) scale(1.4)" opacity="0.85">
+    <!-- Left panel -->
+    <path d="M -300,-200 L -100,-250 L -100,250 L -300,200 Z" 
+          fill="#1e293b" stroke="#334155" stroke-width="2"/>
+    
+    <!-- Center panel -->
+    <path d="M -100,-250 L 0,-200 L 0,200 L -100,250 Z" 
+          fill="#0f172a" stroke="#334155" stroke-width="2"/>
+    
+    <!-- Right center panel -->
+    <path d="M 0,-200 L 100,-250 L 100,250 L 0,200 Z" 
+          fill="#1e293b" stroke="#334155" stroke-width="2"/>
+    
+    <!-- Right panel -->
+    <path d="M 100,-250 L 300,-200 L 300,200 L 100,250 Z" 
+          fill="#0f172a" stroke="#334155" stroke-width="2"/>
+    
+    <!-- Fold lines for depth -->
+    <line x1="-100" y1="-250" x2="-100" y2="250" stroke="#475569" stroke-width="1" opacity="0.5"/>
+    <line x1="0" y1="-200" x2="0" y2="200" stroke="#475569" stroke-width="1" opacity="0.5"/>
+    <line x1="100" y1="-250" x2="100" y2="250" stroke="#475569" stroke-width="1" opacity="0.5"/>
+    
+    <!-- Subtle location pin icon -->
+    <circle cx="0" cy="0" r="35" fill="#10b981" opacity="0.3"/>
+    <circle cx="0" cy="0" r="20" fill="#10b981" opacity="0.5"/>
+    <circle cx="0" cy="0" r="8" fill="#10b981" opacity="0.8"/>
+  </g>
+</svg>

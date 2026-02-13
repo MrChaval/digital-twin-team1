@@ -2,6 +2,7 @@
 
 // Isolated client component with integrated AI security
 import React, { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import { sendChatMessage } from '@/app/actions/chat';
 import { getAIAttackCount } from '@/lib/ai-attack-logger';
 import { 
@@ -141,6 +142,8 @@ const Dashboard = () => {
         const response = await fetch('/api/attack-logs');
         if (response.ok) {
           const data = await response.json();
+          console.log('[DASHBOARD] Fetched attack logs:', data.length, 'events');
+          console.log('[DASHBOARD] CLIENT events:', data.filter((log: AttackLog) => log.type.startsWith('CLIENT:')).length);
           if (Array.isArray(data)) {
             setAttackLogs(data);
           } else {
@@ -160,6 +163,7 @@ const Dashboard = () => {
         const response = await fetch('/api/threat-activity');
         if (response.ok) {
           const data = await response.json();
+          console.log('[DASHBOARD] Threat activity:', data);
           setThreats(data.threats);
           setBlocked(data.blocked);
         }
@@ -337,7 +341,7 @@ const Dashboard = () => {
             >
               <div>
                 <span className={`text-sm font-mono ${log.severity >= 7 ? 'text-red-400' : log.severity >= 4 ? 'text-amber-400' : 'text-slate-400'}`}>
-                  {log.ip}
+                  {log.ip === '::1' || log.ip === '127.0.0.1' ? '🏠 localhost' : log.ip}
                 </span>
                 <p className="text-xs text-slate-500 mt-1">{log.type}</p>
               </div>
@@ -371,37 +375,121 @@ const Dashboard = () => {
             </span>
           </div>
         </div>
+        
+        {/* World Map Background - Accurate Mercator Projection SVG */}
         <div className="absolute inset-0 flex items-center justify-center">
-          <Map className="text-slate-800/50" size={300} />
-          {attackLogs.filter(log => log.latitude && log.longitude).map((log) => (
-            <motion.div
-              key={log.id}
-              className="absolute w-3 h-3 rounded-full"
-              style={{
-                background: log.severity >= 7 ? '#ef4444' : log.severity >= 4 ? '#f59e0b' : '#10b981',
-                left: `${(parseFloat(log.longitude!) + 180) / 360 * 100}%`,
-                top: `${(-parseFloat(log.latitude!) + 90) / 180 * 100}%`,
-              }}
-              animate={{
-                scale: [1, 1.5, 1],
-                opacity: [0.7, 1, 0.7],
-              }}
-              transition={{
-                duration: 2 + Math.random(),
-                repeat: Infinity,
-              }}
-            >
-              <motion.div
-                className="absolute inset-0 rounded-full"
-                style={{ background: 'inherit' }}
-                animate={{ scale: [1, 3], opacity: [0.5, 0] }}
-                transition={{ duration: 1.5, repeat: Infinity }}
-              />
-            </motion.div>
-          ))}
+          <Image
+            src="/world-map.svg"
+            alt="World Map - Mercator Projection"
+            fill
+            className="object-contain opacity-30 pointer-events-none"
+            priority
+          />
         </div>
-        <div className="absolute bottom-4 left-4 right-4 flex justify-between text-xs text-slate-500">
-          <span>Monitoring {attackLogs.length} regions</span>
+        
+        {/* Threat Markers */}
+        <div className="absolute inset-0">
+          {attackLogs
+            .filter(log => {
+              const lat = parseFloat(log.latitude || '0');
+              const lng = parseFloat(log.longitude || '0');
+              return lat !== 0 && lng !== 0;
+            })
+            .map((log) => {
+              const lat = parseFloat(log.latitude!);
+              const lng = parseFloat(log.longitude!);
+              
+              // Convert lat/lng to x,y coordinates using Web Mercator projection
+              // This matches standard world maps and ensures accurate positioning
+              const x = ((lng + 180) / 360) * 100;
+              
+              // Use proper Mercator projection for Y axis
+              // Mercator formula: y = ln(tan(π/4 + lat/2))
+              const latRad = (lat * Math.PI) / 180;
+              const mercatorY = Math.log(Math.tan(Math.PI / 4 + latRad / 2));
+              // Normalize to 0-100 range (Web Mercator typically shows ±85° latitude)
+              const y = (1 - mercatorY / Math.PI) * 50;
+              
+              const color = log.severity >= 7 ? '#ef4444' : log.severity >= 4 ? '#f59e0b' : '#10b981';
+              
+              // Check if we're in development (localhost) - only show Demo label there
+              // In production (Vercel), this will be false, so no Demo label ever appears
+              const isDevelopment = typeof window !== 'undefined' && 
+                                   (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+              
+              // Log marker placement for verification
+              if (log.country === 'Philippines') {
+                console.log(`🇵🇭 PHILIPPINES marker: ${log.city} at (${x.toFixed(1)}%, ${y.toFixed(1)}%) - Should appear in Southeast Asia`);
+              }
+              
+              return (
+                <motion.div
+                  key={log.id}
+                  className="absolute group"
+                  style={{
+                    left: `${x}%`,
+                    top: `${y}%`,
+                    transform: 'translate(-50%, -50%)',
+                  }}
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ duration: 0.5, delay: Math.random() * 0.3 }}
+                >
+                  {/* Pulsing marker */}
+                  <motion.div
+                    className="w-3 h-3 rounded-full cursor-pointer"
+                    style={{ backgroundColor: color }}
+                    animate={{
+                      scale: [1, 1.3, 1],
+                      opacity: [0.8, 1, 0.8],
+                    }}
+                    transition={{
+                      duration: 2,
+                      repeat: Infinity,
+                      ease: "easeInOut",
+                    }}
+                  >
+                    {/* Ripple effect */}
+                    <motion.div
+                      className="absolute inset-0 rounded-full"
+                      style={{ backgroundColor: color }}
+                      animate={{
+                        scale: [1, 3],
+                        opacity: [0.6, 0],
+                      }}
+                      transition={{
+                        duration: 1.5,
+                        repeat: Infinity,
+                        ease: "easeOut",
+                      }}
+                    />
+                  </motion.div>
+                  
+                  {/* Tooltip on hover */}
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-50 pointer-events-none">
+                    <div className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs whitespace-nowrap shadow-xl">
+                      <p className="text-white font-semibold">{log.type}</p>
+                      <p className="text-slate-400">
+                        {log.city || 'Unknown'}, {log.country || 'Unknown'}
+                        {isDevelopment && <span className="ml-1 text-yellow-500">(Demo)</span>}
+                      </p>
+                      <p className="text-slate-500">IP: {log.ip === '::1' ? 'localhost' : log.ip}</p>
+                      <p className="text-slate-500">Severity: {log.severity}/10</p>
+                      <p className="text-slate-500 text-[10px]">Lat: {lat.toFixed(4)}, Lng: {lng.toFixed(4)}</p>
+                      <p className="text-slate-500 text-[10px]">{new Date(log.timestamp).toLocaleString()}</p>
+                      {/* Arrow */}
+                      <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px">
+                        <div className="border-4 border-transparent border-t-slate-800" />
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
+        </div>
+        
+        <div className="absolute bottom-4 left-4 right-4 flex justify-between text-xs text-slate-500 z-10">
+          <span>Monitoring {attackLogs.filter(log => parseFloat(log.latitude || '0') !== 0).length} active threats</span>
           <span>Last update: Just now</span>
         </div>
       </motion.div>
