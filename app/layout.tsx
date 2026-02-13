@@ -7,6 +7,7 @@ import { Footer } from "@/components/footer";
 import { Toaster } from "@/components/ui/sonner";
 import { ClerkProvider } from "@clerk/nextjs";
 import { AuthSync } from "@/components/auth-sync";
+import { ClientSecurityProtection } from "@/components/client-security-protection";
 // import {
 //   SignInButton,
 //   SignUpButton,
@@ -31,9 +32,11 @@ export default function RootLayout({
   return (
     <ClerkProvider>
     <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
+      <body className={inter.className} suppressHydrationWarning>
         {/* Include AuthSync component for auto user role assignment */}
         <AuthSync />
+        {/* Client-side security protections */}
+        <ClientSecurityProtection />
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
           <div className="flex min-h-screen flex-col">
             <Navbar />
