@@ -79,4 +79,19 @@ export const projects = pgTable("projects", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Define the audit_logs table schema - for Zero Trust security audit trail
+export const auditLogs = pgTable("audit_logs", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(), // Clerk user ID
+  userEmail: text("user_email").notNull(),
+  action: varchar("action", { length: 100 }).notNull(), // e.g., "PROJECT_CREATE", "USER_ROLE_UPDATE"
+  resourceType: varchar("resource_type", { length: 50 }).notNull(), // e.g., "project", "user", "newsletter"
+  resourceId: text("resource_id"), // ID of the affected resource
+  status: varchar("status", { length: 20 }).notNull(), // "success", "failed", "denied"
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  metadata: json("metadata"), // Additional context (old/new values, error details, etc.)
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Contact submissions table removed as requested
