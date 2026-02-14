@@ -558,9 +558,13 @@ const Chatbot = () => {
   ]);
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // Scroll only the messages container, not the entire page
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+    }
   };
 
   useEffect(() => {
@@ -626,7 +630,10 @@ const Chatbot = () => {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 p-6 overflow-y-auto space-y-4 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+      <div 
+        ref={messagesContainerRef}
+        className="flex-1 p-6 overflow-y-auto space-y-4 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent"
+      >
         {messages.map((msg) => (
           <motion.div
             key={msg.id}
@@ -802,10 +809,9 @@ const AboutUs = () => {
   ];
 
   const team = [
-    { name: 'Alex Chen', role: 'CEO & Founder', initials: 'AC' },
-    { name: 'Sarah Miller', role: 'CTO', initials: 'SM' },
-    { name: 'James Wilson', role: 'Head of Security', initials: 'JW' },
-    { name: 'Emma Davis', role: 'Lead Engineer', initials: 'ED' },
+    { name: 'Chaval', role: 'Leader', initials: 'CH' },
+    { name: 'Sam', role: 'Member', initials: 'SM' },
+    { name: 'Brix', role: 'Member', initials: 'BR' },
   ];
 
   return (
