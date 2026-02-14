@@ -419,10 +419,41 @@ export function sanitizeInput(input: string): string {
 
 /**
  * Generates a safe error message for blocked prompts
- * Does not reveal detection methods
+ * Educational and transparent for portfolio demonstration
  */
-export function getBlockedPromptMessage(): string {
-  return "I cannot process this request. Please rephrase your question and try again.";
+export function getBlockedPromptMessage(confidence: number = 0.5, patterns: string[] = []): string {
+  // High severity (confidence > 0.7)
+  if (confidence > 0.7) {
+    return "🛡️ SECURITY ALERT: Potential attack detected!\n\n" +
+           "Your message triggered multiple security patterns commonly associated with:\n" +
+           "• Prompt injection attempts\n" +
+           "• System instruction override\n" +
+           "• Unauthorized data extraction\n\n" +
+           "⚠️ This attempt has been logged for security monitoring.\n\n" +
+           "💡 TIP: If you're testing security features, that's great! But please rephrase as a question (e.g., 'How does prompt injection protection work?')";
+  }
+  
+  // Medium severity (confidence 0.4-0.7)
+  if (confidence > 0.4) {
+    return "⚠️ SECURITY WARNING: Suspicious input detected.\n\n" +
+           "Your message contains patterns that may indicate:\n" +
+           "• Attempted security bypass\n" +
+           "• Suspicious commands or instructions\n" +
+           "• Potential system manipulation\n\n" +
+           "🔍 Want to learn about AI security? Try asking educational questions like:\n" +
+           "• 'What security features protect this chatbot?'\n" +
+           "• 'How do you prevent prompt injection?'\n" +
+           "• 'Tell me about your AI governance layer'";
+  }
+  
+  // Low severity (confidence 0.3-0.4)
+  return "⚠️ Your message was flagged by our security system.\n\n" +
+         "This portfolio demonstrates AI security in action! Your input contained suspicious patterns.\n\n" +
+         "💡 You can ask me about:\n" +
+         "• How the security system works\n" +
+         "• What attacks are being prevented\n" +
+         "• Real-time threat monitoring features\n\n" +
+         "Please rephrase your question and I'll be happy to help!";
 }
 
 /**
