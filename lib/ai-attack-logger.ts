@@ -42,6 +42,52 @@ function mapSeverityToNumber(severity: 'low' | 'medium' | 'high' | 'critical'): 
 }
 
 // ============================================================================
+// GEO-LOCATION RESOLVER
+// ============================================================================
+
+/**
+ * Resolves IP address to geo-location using ipapi.co with ip-api.com fallback.
+ * Returns null fields if resolution fails — does not throw.
+ */
+async function resolveGeoLocation(ip: string): Promise<{
+  city: string | null;
+  country: string | null;
+  latitude: string | null;
+  longitude: string | null;
+}> {
+  const empty = { city: null, country: null, latitude: null, longitude: null };
+
+  // Skip non-routable / placeholder IPs
+  if (!ip || ip === 'unknown' || ip === '::1' || ip === '127.0.0.1' || ip === 'localhost' || ip.startsWith('192.168.') || ip.startsWith('10.')) {
+    return empty;
+  }
+
+  try {
+    // Primary: ipapi.co (free, no key, HTTPS)
+    const res1 = await fetch(`https://ipapi.co/${ip}/json/`, { signal: AbortSignal.timeout(3000) });
+    if (res1.ok) {
+      const d = await res1.json();
+      if (d.latitude && d.longitude) {
+        return { city: d.city ?? null, country: d.country_name ?? null, latitude: String(d.latitude), longitude: String(d.longitude) };
+      }
+    }
+  } catch { /* fall through */ }
+
+  try {
+    // Fallback: ip-api.com (free, HTTP, 45 req/min)
+    const res2 = await fetch(`http://ip-api.com/json/${ip}`, { signal: AbortSignal.timeout(3000) });
+    if (res2.ok) {
+      const d = await res2.json();
+      if (d.status === 'success' && d.lat && d.lon) {
+        return { city: d.city ?? null, country: d.country ?? null, latitude: String(d.lat), longitude: String(d.lon) };
+      }
+    }
+  } catch { /* ignore */ }
+
+  return empty;
+}
+
+// ============================================================================
 // LOGGING FUNCTIONS
 // ============================================================================
 
@@ -56,15 +102,16 @@ export async function logPromptInjection(
 ): Promise<void> {
   try {
     const severity = confidence > 0.7 ? 10 : confidence > 0.5 ? 7 : 5;
-    
+    const geo = await resolveGeoLocation(ipAddress);
+
     await db.insert(attackLogs).values({
       ip: ipAddress,
       severity,
       type: `${AI_ATTACK_TYPES.PROMPT_INJECTION} (confidence: ${Math.round(confidence * 100)}%)`,
-      city: null,
-      country: null,
-      latitude: null,
-      longitude: null,
+      city: geo.city,
+      country: geo.country,
+      latitude: geo.latitude,
+      longitude: geo.longitude,
     });
 
     console.log(`[AI SECURITY] Prompt injection detected and logged:`, {
@@ -88,14 +135,16 @@ export async function logOutputLeakage(
   ipAddress: string = 'unknown'
 ): Promise<void> {
   try {
+    const geo = await resolveGeoLocation(ipAddress);
+
     await db.insert(attackLogs).values({
       ip: ipAddress,
       severity: 8, // High severity - system information leak
       type: `${AI_ATTACK_TYPES.AI_OUTPUT_LEAK} (${redactedItems.length} items redacted)`,
-      city: null,
-      country: null,
-      latitude: null,
-      longitude: null,
+      city: geo.city,
+      country: geo.country,
+      latitude: geo.latitude,
+      longitude: geo.longitude,
     });
 
     console.log(`[AI SECURITY] Output leakage prevented and logged:`, {
@@ -117,14 +166,16 @@ export async function logMCPToolDenied(
   ipAddress: string = 'unknown'
 ): Promise<void> {
   try {
+    const geo = await resolveGeoLocation(ipAddress);
+
     await db.insert(attackLogs).values({
       ip: ipAddress,
       severity: 6, // Medium-high severity
       type: `${AI_ATTACK_TYPES.MCP_TOOL_DENIED}: ${toolName}`,
-      city: null,
-      country: null,
-      latitude: null,
-      longitude: null,
+      city: geo.city,
+      country: geo.country,
+      latitude: geo.latitude,
+      longitude: geo.longitude,
     });
 
     console.log(`[AI SECURITY] MCP tool access denied and logged:`, {
@@ -153,14 +204,16 @@ export async function logAISecurityEvent(
       typeDescription += ` (${event.detectedPatterns.length} patterns)`;
     }
     
+    const geo = await resolveGeoLocation(ipAddress);
+
     await db.insert(attackLogs).values({
       ip: ipAddress,
       severity: severityNumber,
       type: typeDescription,
-      city: null,
-      country: null,
-      latitude: null,
-      longitude: null,
+      city: geo.city,
+      country: geo.country,
+      latitude: geo.latitude,
+      longitude: geo.longitude,
     });
 
     console.log(`[AI SECURITY] Event logged:`, {
