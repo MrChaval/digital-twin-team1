@@ -101,7 +101,7 @@ export async function logPromptInjection(
   ipAddress: string = 'unknown'
 ): Promise<void> {
   try {
-    const severity = confidence > 0.7 ? 10 : confidence > 0.5 ? 7 : 5;
+    const severity = 4; // Fixed severity for prompt injection and bot warnings
     const geo = await resolveGeoLocation(ipAddress);
 
     await db.insert(attackLogs).values({
