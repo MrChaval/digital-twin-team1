@@ -583,7 +583,8 @@ export async function sendChatMessage(userInput: string): Promise<ChatResponse> 
     
     // Log to attack_logs table for dashboard visibility
     try {
-      await db.insert(attackLogs).values({
+      // Insert immediately and get the ID for later geo update
+      const [insertedLog] = await db.insert(attackLogs).values({
         ip,
         severity,
         type: attackType,
@@ -592,28 +593,27 @@ export async function sendChatMessage(userInput: string): Promise<ChatResponse> 
         latitude: null,
         longitude: null,
         timestamp: new Date(),
-      });
+      }).returning({ id: attackLogs.id });
       
-      // Fetch geo-location in background (non-blocking)
-      fetch(`https://ipapi.co/${ip}/json/`)
-        .then(res => res.json())
-        .then(async (geo) => {
-          if (geo.city) {
-            await db.insert(attackLogs).values({
-              ip,
-              severity,
-              type: attackType,
-              city: geo.city,
-              country: geo.country_name,
-              latitude: String(geo.latitude),
-              longitude: String(geo.longitude),
-              timestamp: new Date(),
-            });
-          }
-        })
-        .catch(() => {}); // Silent fail for geo lookup
+      console.log('[CHAT] ✅ SQL injection logged to attack_logs:', { id: insertedLog?.id, ip, severity, attackType });
       
-      console.log('[CHAT] ✅ SQL injection logged to attack_logs:', { ip, severity, attackType });
+      // Update with geo-location in background (non-blocking) - UPDATE not INSERT
+      if (insertedLog && ip !== 'unknown' && !ip.startsWith('127.') && !ip.startsWith('::1')) {
+        fetch(`https://ipapi.co/${ip}/json/`, { signal: AbortSignal.timeout(3000) })
+          .then(res => res.json())
+          .then(async (geo) => {
+            if (geo.city && geo.latitude) {
+              const { eq } = await import('drizzle-orm');
+              await db.update(attackLogs).set({
+                city: geo.city,
+                country: geo.country_name,
+                latitude: String(geo.latitude),
+                longitude: String(geo.longitude),
+              }).where(eq(attackLogs.id, insertedLog.id));
+            }
+          })
+          .catch(() => {}); // Silent fail for geo lookup
+      }
     } catch (error) {
       console.error('[CHAT] Failed to log attack:', error);
     }
