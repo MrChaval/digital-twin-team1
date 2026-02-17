@@ -15,6 +15,7 @@ import {
   logPromptInjection, 
   logOutputLeakage 
 } from '@/lib/ai-attack-logger';
+import { validateAndLogInput } from '@/lib/security/sql-injection-logger';
 
 // ============================================================================
 // TYPES
@@ -533,6 +534,29 @@ async function generateResponse(userInput: string): Promise<string> {
  */
 export async function sendChatMessage(userInput: string): Promise<ChatResponse> {
   console.log('[CHAT] Processing message:', userInput.substring(0, 50) + '...');
+  
+  // STEP 0: SQL INJECTION DETECTION - Check before all other validations
+  const sqlValidation = await validateAndLogInput(
+    userInput, 
+    'chatbot_message',
+    { action: 'chat_message' }
+  );
+  
+  // If high-confidence SQL injection detected, block immediately
+  if (!sqlValidation.isSafe && sqlValidation.confidence > 0.7) {
+    console.warn('[CHAT] 🛡️ SQL INJECTION BLOCKED!', {
+      confidence: (sqlValidation.confidence * 100).toFixed(1) + '%',
+      patterns: sqlValidation.patterns.length,
+      input: userInput.substring(0, 50) + '...',
+    });
+    
+    return {
+      success: false,
+      blocked: true,
+      message: 'Invalid input detected. Please avoid special characters and SQL syntax.',
+      reason: `SQL injection attempt detected (confidence: ${(sqlValidation.confidence * 100).toFixed(0)}%)`,
+    };
+  }
   
   // STEP 1: PROMPT INJECTION DETECTION
   const injectionResult = detectPromptInjection(userInput);

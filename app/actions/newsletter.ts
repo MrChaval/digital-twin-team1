@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache"
 import { ActionState, newsletterSubscriptionSchema } from "@/lib/types"
 import { logAuditEvent } from "@/lib/security/audit"
 import { sanitizeError } from "@/lib/security/errors"
+import { validateMultipleInputs } from "@/lib/security/sql-injection-logger"
 
 // Export the interface so it can be used in components
 export interface NewsletterState extends ActionState {
@@ -34,6 +35,23 @@ export async function subscribeToNewsletter(
   // Parse the form data
   const email = formData.get("email") as string
   const name = formData.get("name") as string
+
+  // 🛡️ SQL INJECTION DETECTION - Log any SQL injection attempts
+  const sqlValidation = await validateMultipleInputs([
+    { value: email || '', source: 'newsletter_email' },
+    { value: name || '', source: 'newsletter_name' },
+  ], { action: 'newsletter_subscription' });
+
+  // If SQL injection detected with high confidence, block immediately
+  if (!sqlValidation.allSafe) {
+    const highConfidenceAttack = sqlValidation.results.find(r => r.confidence > 0.7);
+    if (highConfidenceAttack) {
+      return {
+        status: "error",
+        message: "Invalid input detected. Please check your data and try again.",
+      };
+    }
+  }
 
   // Validate the input with Zod schema
   const validationResult = newsletterSubscriptionSchema.safeParse({ email, name });
