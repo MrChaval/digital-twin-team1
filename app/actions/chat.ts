@@ -16,6 +16,8 @@ import {
   logOutputLeakage 
 } from '@/lib/ai-attack-logger';
 import { validateAndLogInput } from '@/lib/security/sql-injection-logger';
+import { db, attackLogs } from '@/lib/db';
+import { headers } from 'next/headers';
 
 // ============================================================================
 // TYPES
@@ -549,6 +551,70 @@ export async function sendChatMessage(userInput: string): Promise<ChatResponse> 
       patterns: sqlValidation.patterns.length,
       input: userInput.substring(0, 50) + '...',
     });
+    
+    // Get IP address from headers
+    const headersList = await headers();
+    const ip = headersList.get('x-forwarded-for')?.split(',')[0] || 
+               headersList.get('x-real-ip') || 
+               'unknown';
+    
+    // Determine attack type based on patterns detected
+    let attackType = 'SQL_INJECTION:GENERAL';
+    let severity = 9;
+    
+    const inputLower = userInput.toLowerCase();
+    if (/admin'?\s*(?:or|and)\s*1\s*=\s*1/i.test(userInput)) {
+      attackType = 'SQL_INJECTION:ADMIN_OR_BYPASS';
+      severity = 10;
+    } else if (/';?\s*drop\s+table/i.test(userInput)) {
+      attackType = 'SQL_INJECTION:DROP_TABLE';
+      severity = 10;
+    } else if (/union\s+select/i.test(userInput)) {
+      attackType = 'SQL_INJECTION:UNION_SELECT';
+      severity = 9;
+    } else if (/\/\*.*\*\/|--|\#/i.test(userInput)) {
+      attackType = 'SQL_INJECTION:COMMENT_INJECTION';
+      severity = 8;
+    }
+    
+    // Log to attack_logs table for dashboard visibility
+    try {
+      await db.insert(attackLogs).values({
+        ip,
+        severity,
+        type: attackType,
+        details: `Chatbot SQL injection: ${userInput.substring(0, 100)}`,
+        city: null,
+        country: null,
+        lat: null,
+        long: null,
+        timestamp: new Date(),
+      });
+      
+      // Fetch geo-location in background (non-blocking)
+      fetch(`https://ipapi.co/${ip}/json/`)
+        .then(res => res.json())
+        .then(async (geo) => {
+          if (geo.city) {
+            await db.insert(attackLogs).values({
+              ip,
+              severity,
+              type: attackType,
+              details: `Chatbot SQL injection (geo-enriched): ${userInput.substring(0, 100)}`,
+              city: geo.city,
+              country: geo.country_name,
+              lat: geo.latitude,
+              long: geo.longitude,
+              timestamp: new Date(),
+            });
+          }
+        })
+        .catch(() => {}); // Silent fail for geo lookup
+      
+      console.log('[CHAT] ✅ SQL injection logged to attack_logs:', { ip, severity, attackType });
+    } catch (error) {
+      console.error('[CHAT] Failed to log attack:', error);
+    }
     
     return {
       success: false,
