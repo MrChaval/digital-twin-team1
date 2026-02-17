@@ -50,7 +50,8 @@ export async function logClientSecurityEvent(
       longitude: null,
     }).returning({ id: attackLogs.id });
 
-    // 2. Fetch geo in background (don't await - fire and forget)\n    if (insertedLog && ip !== \"unknown\" && !ip.startsWith(\"127.\") && !ip.startsWith(\"::1\")) {
+    // 2. Fetch geo in background (don't await - fire and forget)
+    if (insertedLog && ip !== "unknown" && !ip.startsWith("127.") && !ip.startsWith("::1")) {
       (async () => {
         try {
           const geoRes = await fetch(`https://ipapi.co/${ip}/json/`, { signal: AbortSignal.timeout(3000) });
