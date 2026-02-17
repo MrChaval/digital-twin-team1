@@ -1,5 +1,6 @@
 import { db, attackLogs } from "./lib/db";
 import { eq } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import arcjet, { 
@@ -184,6 +185,89 @@ export default clerkMiddleware(async (auth, req) => {
         { status: 403 }
       );
     }
+  }
+
+  // ============================================================================
+  // SQL INJECTION DETECTION - High Priority Logging
+  // ============================================================================
+  // Check for specific SQL injection patterns in URL and headers
+  const url = req.url;
+  const userAgentHeader = req.headers.get("user-agent") || "";
+  const refererHeader = req.headers.get("referer") || "";
+  const allHeaders = [url, userAgentHeader, refererHeader].join(" ").toLowerCase();
+  
+  // Critical SQL injection patterns to detect and log
+  const sqlInjectionPatterns = [
+    { pattern: /admin'\s*(?:or|OR)\s*['"]?1['"]?\s*=\s*['"]?1/gi, type: "SQL_INJECTION:ADMIN_OR_BYPASS", severity: 10 },
+    { pattern: /admin'\s*(?:or|OR)\s*1\s*=\s*1/gi, type: "SQL_INJECTION:ADMIN_OR_BYPASS", severity: 10 },
+    { pattern: /'\s*(?:or|OR)\s*['"]?1['"]?\s*=\s*['"]?1/gi, type: "SQL_INJECTION:OR_BYPASS", severity: 9 },
+    { pattern: /';?\s*(?:DROP|drop)\s+(?:TABLE|table)/gi, type: "SQL_INJECTION:DROP_TABLE", severity: 10 },
+    { pattern: /';?\s*(?:DELETE|delete)\s+(?:FROM|from)/gi, type: "SQL_INJECTION:DELETE_ATTACK", severity: 9 },
+    { pattern: /';?\s*(?:UNION|union)\s+(?:SELECT|select)/gi, type: "SQL_INJECTION:UNION_SELECT", severity: 9 },
+    { pattern: /(?:--|\/\*|#|;--)/gi, type: "SQL_INJECTION:COMMENT_INJECTION", severity: 8 },
+  ];
+
+  let sqlInjectionDetected = false;
+  let attackType = "SQL_INJECTION";
+  let attackSeverity = 9;
+
+  // Check all patterns
+  for (const { pattern, type, severity } of sqlInjectionPatterns) {
+    if (pattern.test(allHeaders) || pattern.test(url)) {
+      sqlInjectionDetected = true;
+      attackType = type;
+      attackSeverity = severity;
+      break; // Use first match (highest priority)
+    }
+  }
+
+  // If SQL injection detected, log it with HIGH severity
+  if (sqlInjectionDetected) {
+    const realIP = getRealClientIP(req);
+    
+    try {
+      // Log attack immediately with high severity
+      const [insertedLog] = await db.insert(attackLogs).values({
+        ip: realIP,
+        severity: attackSeverity, // Severity 9-10 (HIGH/CRITICAL)
+        type: attackType,
+        city: null,
+        country: null,
+        latitude: null,
+        longitude: null,
+      }).returning({ id: attackLogs.id });
+
+      // Fetch geo in background
+      if (insertedLog && realIP !== "unknown" && !realIP.startsWith("127.") && !realIP.startsWith("::1")) {
+        (async () => {
+          try {
+            const geoRes = await fetch(`https://ipapi.co/${realIP}/json/`, { signal: AbortSignal.timeout(3000) });
+            if (geoRes.ok) {
+              const geo = await geoRes.json();
+              if (geo.latitude && geo.longitude) {
+                await db.update(attackLogs).set({
+                  city: geo.city,
+                  country: geo.country_name,
+                  latitude: String(geo.latitude),
+                  longitude: String(geo.longitude),
+                }).where(eq(attackLogs.id, insertedLog.id));
+              }
+            }
+          } catch { /* geo unavailable */ }
+        })();
+      }
+    } catch (err) {
+      console.error("Failed to log SQL injection attack:", err);
+    }
+
+    // Block the request immediately
+    return NextResponse.json(
+      {
+        error: "Forbidden",
+        message: "SQL injection attempt detected and logged",
+      },
+      { status: 403 }
+    );
   }
 
   // Apply Arcjet security checks
