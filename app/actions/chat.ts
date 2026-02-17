@@ -15,7 +15,6 @@ import {
   logPromptInjection, 
   logOutputLeakage 
 } from '@/lib/ai-attack-logger';
-import { validateAndLogInput } from '@/lib/security/sql-injection-logger';
 import { db, attackLogs } from '@/lib/db';
 import { headers } from 'next/headers';
 
@@ -537,14 +536,7 @@ async function generateResponse(userInput: string): Promise<string> {
 export async function sendChatMessage(userInput: string): Promise<ChatResponse> {
   console.log('[CHAT] Processing message:', userInput.substring(0, 50) + '...');
   
-  // STEP 0: SQL INJECTION DETECTION - Check before all other validations
-  const sqlValidation = await validateAndLogInput(
-    userInput, 
-    'chatbot_message',
-    { action: 'chat_message' }
-  );
-  
-  // Also do direct pattern matching for explicit attacks (bypass confidence threshold)
+  // STEP 0: SQL INJECTION DETECTION - Fast direct pattern matching (like proxy.ts)
   const directPatterns = [
     { pattern: /admin'?\s*(?:or|and)\s*['"]?1['"]?\s*=\s*['"]?1/i, type: 'SQL_INJECTION:ADMIN_OR_BYPASS', severity: 10 },
     { pattern: /';?\s*drop\s+table/i, type: 'SQL_INJECTION:DROP_TABLE', severity: 10 },
@@ -552,6 +544,7 @@ export async function sendChatMessage(userInput: string): Promise<ChatResponse> 
     { pattern: /union\s+(all\s+)?select/i, type: 'SQL_INJECTION:UNION_SELECT', severity: 9 },
     { pattern: /';?\s*(delete|update|insert)\s+/i, type: 'SQL_INJECTION:DML_INJECTION', severity: 9 },
     { pattern: /\/\*.*\*\/|--\s*$|#\s*$/i, type: 'SQL_INJECTION:COMMENT_INJECTION', severity: 8 },
+    { pattern: /'\s*(?:or|and)\s+\d+\s*=\s*\d+/i, type: 'SQL_INJECTION:NUMERIC_BYPASS', severity: 9 },
   ];
   
   let directMatch = null;
@@ -562,12 +555,10 @@ export async function sendChatMessage(userInput: string): Promise<ChatResponse> 
     }
   }
   
-  // Block if EITHER: direct pattern match OR high-confidence detection
-  if (directMatch || (!sqlValidation.isSafe && sqlValidation.confidence > 0.3)) {
+  // Block if direct pattern match detected
+  if (directMatch) {
     console.warn('[CHAT] 🛡️ SQL INJECTION BLOCKED!', {
-      confidence: (sqlValidation.confidence * 100).toFixed(1) + '%',
-      patterns: sqlValidation.patterns.length,
-      directMatch: directMatch?.type || 'none',
+      directMatch: directMatch.type,
       input: userInput.substring(0, 50) + '...',
     });
     
@@ -622,7 +613,7 @@ export async function sendChatMessage(userInput: string): Promise<ChatResponse> 
       success: false,
       blocked: true,
       message: 'Invalid input detected. Please avoid special characters and SQL syntax.',
-      reason: `SQL injection attempt detected (confidence: ${(sqlValidation.confidence * 100).toFixed(0)}%)`,
+      reason: `SQL injection attempt detected: ${directMatch.type}`,
     };
   }
   
