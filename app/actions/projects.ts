@@ -13,6 +13,7 @@ import {
 import { logAuditEvent } from "@/lib/security/audit";
 import { requireAdminSession } from "@/lib/security/session";
 import { sanitizeError } from "@/lib/security/errors";
+import { validateMultipleInputs } from "@/lib/security/sql-injection-logger";
 
 /**
  * Server action to fetch all projects
@@ -94,6 +95,47 @@ export async function createProject(
     } else {
       // Direct object submission
       data = formData;
+    }
+    
+    // 🛡️ SQL INJECTION DETECTION - Log any SQL injection attempts
+    const itemsToCheck = Array.isArray(data.items) 
+      ? data.items.join(' ') 
+      : JSON.stringify(data.items);
+    
+    const sqlValidation = await validateMultipleInputs([
+      { value: data.title || '', source: 'project_title' },
+      { value: data.description || '', source: 'project_description' },
+      { value: data.icon || '', source: 'project_icon' },
+      { value: itemsToCheck, source: 'project_items' },
+    ], { 
+      action: 'project_create',
+      userId: currentUser.clerkId,
+      userEmail: currentUser.email,
+    });
+
+    // If SQL injection detected with high confidence, block and log
+    if (!sqlValidation.allSafe) {
+      const highConfidenceAttack = sqlValidation.results.find(r => r.confidence > 0.7);
+      if (highConfidenceAttack) {
+        await logAuditEvent({
+          userId: currentUser.clerkId,
+          userEmail: currentUser.email,
+          action: "PROJECT_CREATE",
+          resourceType: "project",
+          status: "failed",
+          metadata: { 
+            reason: "SQL injection attempt detected",
+            source: highConfidenceAttack.source,
+            confidence: highConfidenceAttack.confidence,
+          }
+        });
+        
+        return { 
+          success: false, 
+          message: "Invalid input detected. Please check your data and try again.", 
+          project: null 
+        };
+      }
     }
     
     // Validate input data using Zod schema
