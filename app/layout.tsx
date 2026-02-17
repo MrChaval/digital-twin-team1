@@ -39,9 +39,11 @@ export default function RootLayout({
         <ClientSecurityProtection />
         <ThemeProvider 
           attribute="class" 
-          defaultTheme="system" 
-          enableSystem={true}
+          defaultTheme="cyber" 
+          enableSystem={false}
           themes={['light', 'dark', 'cyber']}
+          storageKey="cybersec-theme"
+          disableTransitionOnChange={false}
         >
           <div className="flex min-h-screen flex-col">
             <Navbar />

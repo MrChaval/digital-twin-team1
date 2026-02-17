@@ -24,19 +24,19 @@ export async function logClientSecurityEvent(
     const realIp = headersList.get('x-real-ip');
     const ip = forwardedFor?.split(',')[0] || realIp || 'unknown';
 
-    // Determine severity based on event type
-    let severity = 3; // Default: low severity (deterrent events)
+    // Determine severity based on event type (10-point scale)
+    let severity = 3; // Default: low-medium severity 
     
     if (type === 'DEVTOOLS_DETECTED') {
-      severity = 5; // Medium severity - indicates technical user
+      severity = 5; // Medium-high severity - indicates technical user
     } else if (type === 'COPY_ATTEMPT') {
-      severity = 4; // Low-medium - attempting to steal content
+      severity = 4; // Medium severity - attempting to steal content
     } else if (type === 'VIEW_SOURCE_ATTEMPT' || type === 'SAVE_PAGE_ATTEMPT') {
-      severity = 5; // Medium - attempting to download/analyze code
+      severity = 6; // High severity - attempting to download/analyze code
     } else if (type === 'KEYBOARD_SHORTCUT_BLOCKED') {
-      severity = 4; // Low-medium - attempting DevTools access
+      severity = 4; // Medium severity - attempting DevTools access
     } else if (type === 'RIGHT_CLICK_BLOCKED') {
-      severity = 3; // Low - common user behavior
+      severity = 3; // Low-medium severity - common user behavior
     }
 
     // 1. Insert attack log INSTANTLY (appears in dashboard within 2 seconds)

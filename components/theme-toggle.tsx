@@ -42,12 +42,9 @@ export function ThemeToggle() {
           <Moon className="h-4 w-4" />
           <span>Dark</span>
         </DropdownMenuItem>
-        <DropdownMenuItem 
-          onClick={() => setTheme("cyber")} 
-          className="flex items-center gap-2 bg-gradient-to-r from-blue-600/20 to-cyan-600/20 hover:from-blue-600/30 hover:to-cyan-600/30 border border-blue-500/30 text-blue-400 font-semibold"
-        >
-          <Monitor className="h-4 w-4 text-cyan-400" />
-          <span className="bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">Cyber</span>
+        <DropdownMenuItem onClick={() => setTheme("cyber")} className="flex items-center gap-2">
+          <Monitor className="h-4 w-4" />
+          <span>System</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
