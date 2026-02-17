@@ -326,7 +326,18 @@ export default clerkMiddleware(async (auth, req) => {
     // the response to the user.
     const logPromise = (async () => {
       try {
-        const type = decision.reason.toString();
+        // Extract meaningful type from decision.reason
+        let type = 'SECURITY_BLOCK';
+        if (decision.reason.isBot()) {
+          type = 'BOT_DETECTED';
+        } else if (decision.reason.isRateLimit()) {
+          type = 'RATE_LIMIT';
+        } else if (decision.reason.isShield && 'shieldTriggered' in decision.reason) {
+          type = `SHIELD:${decision.reason.shieldTriggered}`;
+        } else if (typeof decision.reason === 'object' && 'type' in decision.reason) {
+          type = String(decision.reason.type);
+        }
+        
         // Default severity for all blocks is 5, but can be customized
         let severity = 5;
         if (decision.reason.isBot()) {
