@@ -1,4 +1,5 @@
 import { db, attackLogs } from "./lib/db";
+import { eq } from "drizzle-orm";
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import arcjet, { 
@@ -190,17 +191,39 @@ export default clerkMiddleware(async (auth, req) => {
   if (decision.isDenied() && decision.reason.isRateLimit()) {
     // Get real client IP for accurate logging
     const realIP = getRealClientIP(req);
-    // Log rate limit violation SYNCHRONOUSLY (blocking) for real-time dashboard
+    
+    // Log attack INSTANTLY, then fetch geo in background (best of both worlds)
     try {
-      await db.insert(attackLogs).values({
+      // 1. Insert attack log immediately (appears in dashboard within 2 seconds)
+      const [insertedLog] = await db.insert(attackLogs).values({
         ip: realIP,
-        severity: 6, // Rate limit severity
+        severity: 6,
         type: "RATE_LIMIT",
-        city: null, // Skip geo for instant logging
+        city: null,
         country: null,
         latitude: null,
         longitude: null,
-      });
+      }).returning({ id: attackLogs.id });
+
+      // 2. Fetch geo in background (don't await - fire and forget)
+      if (insertedLog && realIP !== "unknown" && !realIP.startsWith("127.") && !realIP.startsWith("::1")) {
+        (async () => {
+          try {
+            const geoRes = await fetch(`https://ipapi.co/${realIP}/json/`, { signal: AbortSignal.timeout(3000) });
+            if (geoRes.ok) {
+              const geo = await geoRes.json();
+              if (geo.latitude && geo.longitude) {
+                await db.update(attackLogs).set({
+                  city: geo.city,
+                  country: geo.country_name,
+                  latitude: String(geo.latitude),
+                  longitude: String(geo.longitude),
+                }).where(eq(attackLogs.id, insertedLog.id));
+              }
+            }
+          } catch { /* geo unavailable - attack already logged */ }
+        })();
+      }
     } catch (err) {
       console.error("Failed to log rate limit attack:", err);
     }
@@ -345,7 +368,8 @@ export default clerkMiddleware(async (auth, req) => {
   if (decision.isDenied()) {
     // Get real client IP for accurate logging
     const realIP = getRealClientIP(req);
-    // Log SYNCHRONOUSLY (blocking) for real-time dashboard display
+    
+    // Log attack INSTANTLY, then fetch geo in background
     try {
       // Extract meaningful type from decision.reason
       let type = 'SECURITY_BLOCK';
@@ -371,16 +395,36 @@ export default clerkMiddleware(async (auth, req) => {
         severity = 8; // High severity for XSS
       }
       
-      // Log the attack to the database SYNCHRONOUSLY (blocks response until logged)
-      await db.insert(attackLogs).values({
+      // 1. Insert attack log immediately (real-time dashboard)
+      const [insertedLog] = await db.insert(attackLogs).values({
         ip: realIP,
         severity,
         type,
-        city: null, // Skip geo-lookup for instant logging
+        city: null,
         country: null,
         latitude: null,
         longitude: null,
-      });
+      }).returning({ id: attackLogs.id });
+
+      // 2. Fetch geo in background (don't await)
+      if (insertedLog && realIP !== "unknown" && !realIP.startsWith("127.") && !realIP.startsWith("::1")) {
+        (async () => {
+          try {
+            const geoRes = await fetch(`https://ipapi.co/${realIP}/json/`, { signal: AbortSignal.timeout(3000) });
+            if (geoRes.ok) {
+              const geo = await geoRes.json();
+              if (geo.latitude && geo.longitude) {
+                await db.update(attackLogs).set({
+                  city: geo.city,
+                  country: geo.country_name,
+                  latitude: String(geo.latitude),
+                  longitude: String(geo.longitude),
+                }).where(eq(attackLogs.id, insertedLog.id));
+              }
+            }
+          } catch { /* geo unavailable - attack already logged */ }
+        })();
+      }
 
       console.warn("Arcjet blocked request:", {
         reason: decision.reason,
