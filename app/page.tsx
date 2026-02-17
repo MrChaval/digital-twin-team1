@@ -184,9 +184,9 @@ const Dashboard = () => {
     fetchAttackLogs();
     fetchThreatActivity();
     fetchAIAttacks();
-    const attackLogsInterval = setInterval(fetchAttackLogs, 5000);
-    const threatActivityInterval = setInterval(fetchThreatActivity, 5000);
-    const aiAttacksInterval = setInterval(fetchAIAttacks, 5000);
+    const attackLogsInterval = setInterval(fetchAttackLogs, 2000); // Refresh every 2 seconds for real-time updates
+    const threatActivityInterval = setInterval(fetchThreatActivity, 2000);
+    const aiAttacksInterval = setInterval(fetchAIAttacks, 2000);
 
     return () => {
       clearInterval(attackLogsInterval);
