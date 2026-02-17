@@ -15,7 +15,8 @@ import {
   logPromptInjection, 
   logOutputLeakage 
 } from '@/lib/ai-attack-logger';
-import { validateAndLogInput } from '@/lib/security/sql-injection-logger';
+import { db, attackLogs } from '@/lib/db';
+import { headers } from 'next/headers';
 
 // ============================================================================
 // TYPES
@@ -535,26 +536,84 @@ async function generateResponse(userInput: string): Promise<string> {
 export async function sendChatMessage(userInput: string): Promise<ChatResponse> {
   console.log('[CHAT] Processing message:', userInput.substring(0, 50) + '...');
   
-  // STEP 0: SQL INJECTION DETECTION - Check before all other validations
-  const sqlValidation = await validateAndLogInput(
-    userInput, 
-    'chatbot_message',
-    { action: 'chat_message' }
-  );
+  // STEP 0: SQL INJECTION DETECTION - Fast direct pattern matching (like proxy.ts)
+  const directPatterns = [
+    { pattern: /admin'?\s*(?:or|and)\s*['"]?1['"]?\s*=\s*['"]?1/i, type: 'SQL_INJECTION:ADMIN_OR_BYPASS', severity: 10 },
+    { pattern: /';?\s*drop\s+table/i, type: 'SQL_INJECTION:DROP_TABLE', severity: 10 },
+    { pattern: /'\s*or\s*['"]?1['"]?\s*=\s*['"]?1/i, type: 'SQL_INJECTION:OR_BYPASS', severity: 9 },
+    { pattern: /union\s+(all\s+)?select/i, type: 'SQL_INJECTION:UNION_SELECT', severity: 9 },
+    { pattern: /';?\s*(delete|update|insert)\s+/i, type: 'SQL_INJECTION:DML_INJECTION', severity: 9 },
+    { pattern: /\/\*.*\*\/|--\s*$|#\s*$/i, type: 'SQL_INJECTION:COMMENT_INJECTION', severity: 8 },
+    { pattern: /'\s*(?:or|and)\s+\d+\s*=\s*\d+/i, type: 'SQL_INJECTION:NUMERIC_BYPASS', severity: 9 },
+  ];
   
-  // If high-confidence SQL injection detected, block immediately
-  if (!sqlValidation.isSafe && sqlValidation.confidence > 0.7) {
+  let directMatch = null;
+  for (const p of directPatterns) {
+    if (p.pattern.test(userInput)) {
+      directMatch = p;
+      break;
+    }
+  }
+  
+  // Block if direct pattern match detected
+  if (directMatch) {
     console.warn('[CHAT] 🛡️ SQL INJECTION BLOCKED!', {
-      confidence: (sqlValidation.confidence * 100).toFixed(1) + '%',
-      patterns: sqlValidation.patterns.length,
+      directMatch: directMatch.type,
       input: userInput.substring(0, 50) + '...',
     });
+    
+    // Get IP address from headers
+    const headersList = await headers();
+    const ip = headersList.get('x-forwarded-for')?.split(',')[0] || 
+               headersList.get('x-real-ip') || 
+               'unknown';
+    
+    // Use direct match if available, otherwise fallback to pattern detection
+    let attackType = directMatch?.type || 'SQL_INJECTION:GENERAL';
+    let severity = directMatch?.severity || 9;
+    
+    // Log to attack_logs table for dashboard visibility
+    try {
+      // Insert immediately and get the ID for later geo update
+      const [insertedLog] = await db.insert(attackLogs).values({
+        ip,
+        severity,
+        type: attackType,
+        city: null,
+        country: null,
+        latitude: null,
+        longitude: null,
+        timestamp: new Date(),
+      }).returning({ id: attackLogs.id });
+      
+      console.log('[CHAT] ✅ SQL injection logged to attack_logs:', { id: insertedLog?.id, ip, severity, attackType });
+      
+      // Update with geo-location in background (non-blocking) - UPDATE not INSERT
+      if (insertedLog && ip !== 'unknown' && !ip.startsWith('127.') && !ip.startsWith('::1')) {
+        fetch(`https://ipapi.co/${ip}/json/`, { signal: AbortSignal.timeout(3000) })
+          .then(res => res.json())
+          .then(async (geo) => {
+            if (geo.city && geo.latitude) {
+              const { eq } = await import('drizzle-orm');
+              await db.update(attackLogs).set({
+                city: geo.city,
+                country: geo.country_name,
+                latitude: String(geo.latitude),
+                longitude: String(geo.longitude),
+              }).where(eq(attackLogs.id, insertedLog.id));
+            }
+          })
+          .catch(() => {}); // Silent fail for geo lookup
+      }
+    } catch (error) {
+      console.error('[CHAT] Failed to log attack:', error);
+    }
     
     return {
       success: false,
       blocked: true,
       message: 'Invalid input detected. Please avoid special characters and SQL syntax.',
-      reason: `SQL injection attempt detected (confidence: ${(sqlValidation.confidence * 100).toFixed(0)}%)`,
+      reason: `SQL injection attempt detected: ${directMatch.type}`,
     };
   }
   

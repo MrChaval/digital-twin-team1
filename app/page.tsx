@@ -31,6 +31,8 @@ interface Message {
   isUser: boolean;
   timestamp: Date;
   isBlocked?: boolean;
+  blocked?: boolean;
+  attackType?: string;
 }
 
 interface AttackLog {
@@ -227,7 +229,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 30000);
+    const interval = setInterval(fetchData, 5000); // Poll every 5 seconds for real-time updates
     return () => clearInterval(interval);
   }, [fetchData]);
 
@@ -590,9 +592,10 @@ const Chatbot = () => {
   const handleSend = async () => {
     if (!input.trim()) return;
     
+    const userInput = input;
     const userMsg: Message = {
       id: messages.length + 1,
-      text: input,
+      text: userInput,
       isUser: true,
       timestamp: new Date()
     };
@@ -620,10 +623,14 @@ const Chatbot = () => {
         const filtered = prev.filter(msg => msg.id !== loadingMsg.id);
         const botMsg: Message = {
           id: messages.length + 2,
-          text: response.message,
+          text: response.blocked 
+            ? `🛡️ ATTACK BLOCKED!\n\n${response.message}\n\n⚠️ Reason: ${response.reason}\n\n📊 This attack has been logged to the security dashboard.`
+            : response.message,
           isUser: false,
           timestamp: new Date(),
-          isBlocked: response.blocked || false
+          isBlocked: response.blocked || false,
+          blocked: response.blocked,
+          attackType: response.reason,
         };
         return [...filtered, botMsg];
       });
@@ -641,6 +648,7 @@ const Chatbot = () => {
         };
         return [...filtered, errorMsg];
       });
+    }
     }
   };
 
@@ -687,14 +695,20 @@ const Chatbot = () => {
             <div className={`max-w-[70%] ${
               msg.isUser 
                 ? 'bg-gradient-to-r from-blue-600 to-blue-500' 
-                : msg.isBlocked 
+                : (msg.isBlocked || msg.blocked)
                   ? 'bg-gradient-to-r from-red-600/20 to-red-500/20 border border-red-500/30' 
                   : 'bg-card'
             } rounded-2xl px-4 py-3`}>
+              {(msg.blocked || msg.isBlocked) && !msg.isUser && (
+                <div className="flex items-center gap-2 mb-2 pb-2 border-b border-red-500/30">
+                  <ShieldAlert className="text-red-400" size={18} />
+                  <span className="text-red-400 font-bold text-xs uppercase tracking-wider">Security Alert</span>
+                </div>
+              )}
               <div className={`text-sm ${
                 msg.isUser 
                   ? 'text-white' 
-                  : msg.isBlocked 
+                  : (msg.isBlocked || msg.blocked)
                     ? 'text-red-200' 
                     : 'text-foreground/90'
               } whitespace-pre-wrap leading-relaxed`}>
@@ -717,7 +731,7 @@ const Chatbot = () => {
               <p className={`text-[10px] mt-1 ${
                 msg.isUser 
                   ? 'text-blue-200' 
-                  : msg.isBlocked 
+                  : (msg.isBlocked || msg.blocked)
                     ? 'text-red-300' 
                     : 'text-muted-foreground/80'
               }`}>
