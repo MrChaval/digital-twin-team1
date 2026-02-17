@@ -649,7 +649,6 @@ const Chatbot = () => {
         return [...filtered, errorMsg];
       });
     }
-    }
   };
 
   return (
