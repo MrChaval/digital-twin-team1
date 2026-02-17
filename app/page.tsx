@@ -225,7 +225,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 30000);
+    const interval = setInterval(fetchData, 5000); // Poll every 5 seconds for real-time updates
     return () => clearInterval(interval);
   }, [fetchData]);
 
