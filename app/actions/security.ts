@@ -1,6 +1,7 @@
 'use server';
 
 import { db, attackLogs } from '@/lib/db';
+import { eq } from 'drizzle-orm';
 import { headers } from 'next/headers';
 
 /**
@@ -38,19 +39,36 @@ export async function logClientSecurityEvent(
       severity = 3; // Low - common user behavior
     }
 
-    // Skip geolocation for INSTANT real-time logging (teacher demo requirement)
-    const geoData = null;
-
-    // Log to database
-    await db.insert(attackLogs).values({
+    // 1. Insert attack log INSTANTLY (appears in dashboard within 2 seconds)
+    const [insertedLog] = await db.insert(attackLogs).values({
       ip,
       severity,
       type: `CLIENT:${type}`,
-      city: geoData?.city || null,
-      country: geoData?.country_name || null,
-      latitude: geoData?.latitude?.toString() || null,
-      longitude: geoData?.longitude?.toString() || null,
-    });
+      city: null,
+      country: null,
+      latitude: null,
+      longitude: null,
+    }).returning({ id: attackLogs.id });
+
+    // 2. Fetch geo in background (don't await - fire and forget)
+    if (insertedLog && ip !== "unknown" && !ip.startsWith("127.") && !ip.startsWith("::1")) {
+      (async () => {
+        try {
+          const geoRes = await fetch(`https://ipapi.co/${ip}/json/`, { signal: AbortSignal.timeout(3000) });
+          if (geoRes.ok) {
+            const geo = await geoRes.json();
+            if (geo.latitude && geo.longitude) {
+              await db.update(attackLogs).set({
+                city: geo.city,
+                country: geo.country_name,
+                latitude: String(geo.latitude),
+                longitude: String(geo.longitude),
+              }).where(eq(attackLogs.id, insertedLog.id));
+            }
+          }
+        } catch { /* geo unavailable - attack already logged */ }
+      })();
+    }
 
     console.log(`[CLIENT_SECURITY] Logged: ${type} from ${ip} (severity: ${severity})`);
     
