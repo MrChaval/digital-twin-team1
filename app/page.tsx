@@ -214,7 +214,7 @@ const Dashboard = () => {
     try {
       setLoading(true);
       setError(null);
-      const res = await fetch('/api/attack-logs');
+      const res = await fetch('/api/attack-logs?hours=24&limit=500');
       if (!res.ok) throw new Error(`API error: ${res.status}`);
       const data: AttackLog[] = await res.json();
       setLogs(data);
