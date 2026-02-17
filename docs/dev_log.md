@@ -7801,3 +7801,52 @@ if (decision.reason.isBot()) {
 **Status:** ✅ Code fixes complete - Ready for GitHub push and PR creation
 **Next Step:** Push to GitHub → Create PR → Merge → Vercel auto-deploy → Test from Kali
 
+---
+
+## 2026-02-17 - UI Overhaul: World Map, Branding & Navigation Cleanup
+**Timestamp:** 2026-02-17 22:00 UTC  
+**Modified by:** GitHub Copilot AI Assistant  
+**Branch:** feat/ui-overhaul-protagon-defense  
+**Commit:** Pending
+
+### Changes Made:
+
+#### 1. World Map — Attacker IP Mapping with world.svg
+- Replaced hardcoded `MAP_PATHS` continent outlines with the real `world.svg` (Simplemaps, MIT license)
+- Copied `world.svg` to `public/world.svg` for static serving
+- Updated SVG viewBox from `0 0 1000 500` to `0 0 2000 857` to match world.svg dimensions
+- Updated `geoToXY()` projection function to map lat/lon onto 2000×857 coordinate space
+- Attack points now render IP labels above each dot on the map
+- Increased dot radius and pulse animation for better visibility on larger map
+- Aspect ratio adjusted to `42.85%` to match 2000:857 ratio
+
+#### 2. Navigation Cleanup — Removed Top Nav Links
+- Removed Home, About, Blog, Projects links from desktop navbar
+- Removed same links from mobile hamburger menu
+- Cleaned up unused imports (`usePathname`, `cn`, `Shield`)
+
+#### 3. Branding — Removed Cyber App Logo & Name
+- Removed Shield icon and "CyberApp" text from top navbar header
+
+#### 4. Branding — Renamed SECURE_BOT to Protagon Defense
+- Updated sidebar header: `SECURE_BOT` → `Protagon Defense`
+- Updated chatbot greeting message
+- Updated chatbot header name
+- Updated About section heading
+- Updated contact email: `support@protagondefense.io`
+- Updated contact website: `www.protagondefense.io`
+
+#### 5. Footer — Removed Resources Section
+- Removed entire Resources column (Blog, Security Tools, Security Guides, Security Checklists)
+- Changed footer grid from 3-column to 2-column layout (branding + legal)
+- Renamed footer brand from "CyberShield" to "Protagon Defense"
+- Updated copyright text to "Protagon Defense"
+
+### Files Modified:
+- `app/page.tsx` — World map, SECURE_BOT renaming, contact info updates
+- `components/navbar.tsx` — Removed nav links, logo, and unused imports
+- `components/footer.tsx` — Removed resources, updated branding
+- `public/world.svg` — Added world map SVG asset
+
+**Status:** ✅ All changes complete — No lint/type errors
+
