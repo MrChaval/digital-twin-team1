@@ -24,10 +24,10 @@ export default async function AdminPage() {
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8">
         {/* Database Tools Card */}
-        <Card>
+        <Card className="bg-card border-border">
           <CardHeader>
-            <CardTitle>Database Tools</CardTitle>
-            <CardDescription>Access database utilities and testing functions</CardDescription>
+            <CardTitle className="text-foreground">Database Tools</CardTitle>
+            <CardDescription className="text-muted-foreground">Access database utilities and testing functions</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -42,10 +42,10 @@ export default async function AdminPage() {
         </Card>
       </div>
 
-      <Card className="mb-8">
+      <Card className="mb-8 bg-card border-border">
         <CardHeader>
-          <CardTitle>User Management</CardTitle>
-          <CardDescription>View and manage user roles.</CardDescription>
+          <CardTitle className="text-foreground">User Management</CardTitle>
+          <CardDescription className="text-muted-foreground">View and manage user roles.</CardDescription>
         </CardHeader>
         <CardContent>
           <UserRoleManagement />
@@ -53,10 +53,10 @@ export default async function AdminPage() {
       </Card>
 
       {/* Example of another admin section */}
-      <Card>
+      <Card className="bg-card border-border">
         <CardHeader>
-          <CardTitle>System Settings</CardTitle>
-          <CardDescription>Configure system-wide settings.</CardDescription>
+          <CardTitle className="text-foreground">System Settings</CardTitle>
+          <CardDescription className="text-muted-foreground">Configure system-wide settings.</CardDescription>
         </CardHeader>
         <CardContent>
           <form className="space-y-4">
