@@ -39,8 +39,8 @@ export default function RootLayout({
         <ClientSecurityProtection />
         <ThemeProvider 
           attribute="class" 
-          defaultTheme="cyber" 
-          enableSystem={false}
+          defaultTheme="system" 
+          enableSystem={true}
           themes={['light', 'dark', 'cyber']}
         >
           <div className="flex min-h-screen flex-col">
