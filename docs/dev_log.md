@@ -5138,3 +5138,151 @@ Closes #[ISSUE] - Accurate threat geolocation
 **Ready for:** Production Deployment
 **Risk Level:** Low (improves existing feature, backward compatible)
 
+---
+
+## 2026-02-17 - Fixed Attack Logs Display Issues ("[object Object]")
+**Timestamp:** 2026-02-17 16:39:08 UTC+8
+**Modified by:** Brix (via GitHub Copilot AI Assistant)
+**Branch:** fix/attack-logs-display
+**Commit:** be7f322
+
+### Problem Identified:
+- **Issue 1**: Live Attack Logs displaying "[object Object]" instead of event types
+- **Issue 2**: IP addresses showing duplicate "localhost localhost" with emoji
+- **Root Cause 1**: proxy.ts calling `decision.reason.toString()` on Arcjet decision object
+- **Root Cause 2**: app/page.tsx displaying "🏠 localhost" for local IPs instead of actual address
+
+### Changes Made:
+
+#### 1. Fixed Event Type Extraction (proxy.ts)
+**File:** proxy.ts (renamed from middleware.ts for Next.js 16 compatibility)
+**Lines Modified:** 318-345
+
+**Before:**
+```typescript
+const type = decision.reason.toString(); // Returns "[object Object]"
+```
+
+**After:**
+```typescript
+// Extract meaningful type from decision.reason
+let type = 'SECURITY_BLOCK';
+if (decision.reason.isBot()) {
+  type = 'BOT_DETECTED';
+} else if (decision.reason.isRateLimit()) {
+  type = 'RATE_LIMIT';
+} else if (decision.reason.isShield && 'shieldTriggered' in decision.reason) {
+  type = `SHIELD:${decision.reason.shieldTriggered}`;
+} else if (typeof decision.reason === 'object' && 'type' in decision.reason) {
+  type = String(decision.reason.type);
+}
+```
+
+**Event Types Now Logged:**
+- BOT_DETECTED - Automated bot traffic blocked
+- RATE_LIMIT - Too many requests from single IP
+- SHIELD:SQL_INJECTION - SQL injection attempt blocked
+- SHIELD:XSS - Cross-site scripting attempt blocked
+- SHIELD:PATH_TRAVERSAL - Path traversal attack blocked
+- SECURITY_BLOCK - Generic security denial
+
+#### 2. Added Display Fallback (app/page.tsx)
+**Lines Modified:** 347-349
+
+**Before:**
+```typescript
+<p className="text-xs text-slate-500 mt-1">
+  {log.type}
+</p>
+```
+
+**After:**
+```typescript
+<p className="text-xs text-slate-500 mt-1">
+  {typeof log.type === 'string' && log.type !== '[object Object]' 
+    ? log.type 
+    : 'SECURITY_EVENT'}
+</p>
+```
+
+**Benefits:**
+- Old corrupted logs show "SECURITY_EVENT" instead of "[object Object]"
+- New logs display proper event types
+- Graceful degradation for data integrity issues
+
+#### 3. Fixed IP Address Display (app/page.tsx)
+**Line Modified:** 345
+
+**Before:**
+```typescript
+{log.ip === '::1' || log.ip === '127.0.0.1' ? '🏠 localhost' : log.ip}
+```
+
+**After:**
+```typescript
+{log.ip}
+```
+
+**Impact:**
+- Shows actual IP addresses: 127.0.0.1, ::1, 192.168.56.1
+- No more duplicate "localhost localhost" display
+- Consistent with professional security dashboard standards
+
+#### 4. Next.js 16 Compatibility
+**File Renamed:** middleware.ts → proxy.ts
+
+**Reason:**
+- Next.js 16 deprecated middle ware.ts file convention
+- Warning: "The 'middleware' file convention is deprecated. Please use 'proxy' instead."
+- Maintains same security functionality (Arcjet Shield, Bot Detection, Rate Limiting)
+
+### Files Modified:
+- `proxy.ts` (renamed from middleware.ts) - Event type extraction logic
+- `app/page.tsx` - Display fallback and IP address formatting
+- `.env.local` - Added ARCJET_KEY from Vercel environment variables
+
+### Deployment Status:
+- ✅ Branch created: fix/attack-logs-display
+- ✅ All changes committed (commit be7f322)
+- ⏳ Ready to push to GitHub
+- ⏳ Pull request will be created after push
+- ⏳ Vercel will auto-deploy on merge
+
+### Testing Plan (After Deployment):
+1. **Verify Attack Logs Display:**
+   - Check Live Attack Logs section on production URL
+   - Confirm no "[object Object]" appears
+   - Verify event types show: BOT_DETECTED, RATE_LIMIT, SHIELD:*
+   
+2. **Test from Kali Linux:**
+   - curl requests should be blocked (BOT_DETECTED)
+   - Rate limiting should trigger after 50 requests
+   - All blocks should log with correct event types
+
+3. **Validate IP Display:**
+   - Localhost attacks show: 127.0.0.1 or ::1
+   - Kali VM attacks show: 192.168.56.X
+   - No emoji or duplicate text
+
+### Security Configuration:
+- **Arcjet Shield:** SQL injection, XSS, path traversal protection
+- **Bot Detection:** Blocks automated tools (curl, wget, scrapers)
+- **Rate Limiting:** 50 requests per 10 seconds
+- **ARCJET_KEY:** Configured in Vercel environment variables
+
+### Known Issues Resolved:
+- ✅ "[object Object]" in attack logs (fixed)
+- ✅ Duplicate "localhost localhost" display (fixed)
+- ✅ Next.js 16 middl eware.ts deprecation warning (fixed via rename)
+- ⚠️ Local development security not enforcing (Next.js 16 compatibility issue)
+  - **Workaround:** Test in production Vercel deployment
+
+### Notes for Team:
+- Old attack logs with "[object Object]" will show "SECURITY_EVENT" fallback
+- New attacks from this deployment forward will show correct types
+- Arcjet security works in production Vercel, not in local Next.js 16 dev server
+- Kali Linux VM ready for penetration testing once deployed
+
+**Status:** ✅ Code fixes complete - Ready for GitHub push and PR creation
+**Next Step:** Push to GitHub → Create PR → Merge → Vercel auto-deploy → Test from Kali
+
