@@ -212,7 +212,7 @@ const Dashboard = () => {
     try {
       setLoading(true);
       setError(null);
-      const res = await fetch('/api/attack-logs');
+      const res = await fetch('/api/attack-logs?hours=24&limit=500');
       if (!res.ok) throw new Error(`API error: ${res.status}`);
       const data: AttackLog[] = await res.json();
       setLogs(data);
@@ -248,16 +248,36 @@ const Dashboard = () => {
   }, [logs]);
 
   const timelineData = useMemo(() => {
+    // Create 24 hourly buckets for last 24 hours
+    const now = new Date();
     const buckets: Record<string, { high: number; med: number; low: number }> = {};
+    
+    // Initialize all 24 hours with zero values
+    for (let i = 23; i >= 0; i--) {
+      const d = new Date(now.getTime() - i * 60 * 60 * 1000);
+      const key = `${String(d.getHours()).padStart(2, '0')}:00`;
+      buckets[key] = { high: 0, med: 0, low: 0 };
+    }
+    
+    // Fill with actual log data
     logs.forEach(l => {
       const d = new Date(l.timestamp);
-      const key = `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:00`;
-      if (!buckets[key]) buckets[key] = { high: 0, med: 0, low: 0 };
-      if (l.severity >= 7) buckets[key].high++;
-      else if (l.severity >= 4) buckets[key].med++;
-      else buckets[key].low++;
+      const key = `${String(d.getHours()).padStart(2, '0')}:00`;
+      if (buckets[key]) {
+        if (l.severity >= 7) buckets[key].high++;
+        else if (l.severity >= 4) buckets[key].med++;
+        else buckets[key].low++;
+      }
     });
-    return Object.entries(buckets).sort(([a], [b]) => a.localeCompare(b)).slice(-15).map(([time, v]) => ({ time: time.split(' ')[1] || time, ...v }));
+    
+    // Convert to array in chronological order (now at end)
+    const result: { time: string; high: number; med: number; low: number }[] = [];
+    for (let i = 23; i >= 0; i--) {
+      const d = new Date(now.getTime() - i * 60 * 60 * 1000);
+      const key = `${String(d.getHours()).padStart(2, '0')}:00`;
+      result.push({ time: key, ...buckets[key] });
+    }
+    return result;
   }, [logs]);
 
   const pieData = useMemo(() => [

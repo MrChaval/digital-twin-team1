@@ -1,5 +1,80 @@
 # Development Log
 
+## 2026-02-18 - Extended Dashboard to 24-Hour Time Window with Storage Management
+**Timestamp:** 2026-02-18 11:30 UTC  
+**Modified by:** JaiZz (with GitHub Copilot AI Assistant)  
+**Branch:** feat/zero-trust-security-integration  
+**Commit:** Pending
+
+### Purpose:
+Extended the threat activity dashboard from recent logs to a full 24-hour time window, showing hourly threat patterns. Added storage statistics API for monitoring Neon PostgreSQL free tier usage (0.5GB limit).
+
+### Implementation Details:
+
+#### 1. **API Time Window Filtering**
+Modified `/api/attack-logs/route.ts` to support time-based filtering:
+
+```typescript
+// Query params: hours (default 24), limit (default 500)
+const hours = parseInt(searchParams.get('hours') || '24', 10);
+const limit = parseInt(searchParams.get('limit') || '500', 10);
+
+const cutoffTime = new Date(Date.now() - hours * 60 * 60 * 1000);
+const logs = await db.select().from(attackLogs)
+  .where(gte(attackLogs.timestamp, cutoffTime))
+  .orderBy(desc(attackLogs.timestamp))
+  .limit(Math.min(limit, 1000));
+```
+
+#### 2. **24-Hour Timeline Chart**
+Updated `app/page.tsx` to display 24 hourly buckets:
+
+- Initializes all 24 hours with zero values for consistent chart display
+- Maps logs to appropriate hour buckets by severity (high/med/low)
+- Chronological display with current hour at the end
+- Fetch call updated: `/api/attack-logs?hours=24&limit=500`
+
+#### 3. **Storage Statistics API**
+Added GET handler to `/api/clean-logs/route.ts`:
+
+```typescript
+GET /api/clean-logs
+Returns:
+- totalLogs: number
+- estimatedSizeMB: string
+- oldestLog / newestLog: timestamps
+- breakdown: { last24h, last7d, last30d, olderThan30d }
+- storageRecommendation: { neonFreeLimit, remainingCapacityMB, maxLogsEstimate }
+```
+
+#### 4. **Log Cleanup Endpoints**
+Enhanced DELETE handler with flexible cleanup options:
+
+```bash
+# Time-based cleanup (1-365 days)
+DELETE /api/clean-logs?retentionDays=30
+
+# Country-based cleanup
+DELETE /api/clean-logs?country=Egypt
+
+# Legacy default: removes Egypt + United States
+DELETE /api/clean-logs
+```
+
+### Storage Recommendations:
+Based on Neon free tier (0.5GB / 500MB):
+- **Current usage**: ~0.03GB (6% used, 470MB remaining)
+- **Estimated capacity**: ~1,000,000 logs (500 bytes per log)
+- **At 1000 logs/day**: 1000+ days of storage
+- **Recommendation**: Keep 30 days detailed, aggregate older if needed
+
+### Files Modified:
+- `app/api/attack-logs/route.ts`: Added time window filtering (hours, limit params)
+- `app/page.tsx`: 24-hour timeline buckets, updated fetch with params
+- `app/api/clean-logs/route.ts`: Added GET stats, enhanced DELETE with retentionDays
+
+---
+
 ## 2026-02-17 - Added Chatbot SQL Injection Logging to Attack Dashboard
 **Timestamp:** 2026-02-17 22:45 UTC  
 **Modified by:** JaiZz (with GitHub Copilot AI Assistant)  
