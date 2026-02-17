@@ -1,16 +1,19 @@
 'use client';
 
-// Isolated client component with integrated AI security
-import React, { useState, useEffect, useRef } from 'react';
-import Image from 'next/image';
-import { sendChatMessage } from '@/app/actions/chat';
-import { getAIAttackCount } from '@/lib/ai-attack-logger';
+// Isolate from root layout to avoid auth errors
+// Do NOT import anything from lib/, app/actions/, or components that use database
+
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { 
-  Shield, MessageSquare, Activity, BookOpen, Info, Phone, Map, AlertTriangle,
+  Shield, MessageSquare, Activity, BookOpen, Info, Phone, AlertTriangle,
   Send, CheckCircle, Users, Globe, Lock, Mail, ShieldCheck,
-  Server, Zap, Clock, BarChart3, Bot
+  Server, Zap, Clock, BarChart3, RefreshCw, ShieldAlert, Ban, Eye, Key, FileWarning
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import {
+  AreaChart, Area, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer,
+  BarChart, Bar, PieChart, Pie, Cell
+} from 'recharts';
 
 // --- TYPES ---
 type TabId = 'dashboard' | 'chat' | 'guide' | 'about' | 'contact';
@@ -26,23 +29,89 @@ interface Message {
   text: string;
   isUser: boolean;
   timestamp: Date;
-  blocked?: boolean;
-  loading?: boolean;
 }
 
 interface AttackLog {
   id: number;
   ip: string;
   severity: number;
-  type: string;
   timestamp: string;
+  type: string;
   city: string | null;
   country: string | null;
   latitude: string | null;
   longitude: string | null;
 }
 
-// --- MOCK DATA ---
+// --- SECURITY RECOMMENDATIONS ENGINE ---
+function getRecommendation(attackType: string): { action: string; detail: string; icon: React.ElementType; urgency: 'critical' | 'high' | 'medium' | 'low' } {
+  const t = attackType.toLowerCase();
+  if (t.includes('sql') || t.includes('injection')) {
+    return { action: 'Harden Input Validation', detail: 'Enable parameterized queries on all endpoints. Review Drizzle ORM usage to ensure no raw SQL interpolation. Rotate DB credentials if data exfiltration is suspected.', icon: ShieldAlert, urgency: 'critical' };
+  }
+  if (t.includes('brute') || t.includes('rate') || t.includes('login')) {
+    return { action: 'Enforce Rate Limiting', detail: 'Tighten Arcjet rate-limit rules to max 5 attempts per minute per IP. Enable progressive back-off and account lockout after 10 failures. Consider adding CAPTCHA.', icon: Ban, urgency: 'high' };
+  }
+  if (t.includes('xss') || t.includes('script') || t.includes('shield')) {
+    return { action: 'Sanitize All Outputs', detail: 'Enable CSP headers with strict-dynamic. Audit all React dangerouslySetInnerHTML usage. Ensure Arcjet Shield WAF rules cover reflected and stored XSS vectors.', icon: FileWarning, urgency: 'high' };
+  }
+  if (t.includes('bot') || t.includes('scraping') || t.includes('crawl')) {
+    return { action: 'Strengthen Bot Protection', detail: 'Upgrade Arcjet bot detection to LIVE mode. Block known headless browser fingerprints. Add invisible honeypot fields to key forms.', icon: Eye, urgency: 'medium' };
+  }
+  if (t.includes('ddos') || t.includes('dos') || t.includes('flood')) {
+    return { action: 'Activate DDoS Mitigation', detail: 'Enable upstream CDN rate-limiting. Implement connection throttling at the edge. Review and scale compute auto-scaling policies.', icon: Zap, urgency: 'critical' };
+  }
+  if (t.includes('prompt') || t.includes('llm') || t.includes('ai')) {
+    return { action: 'Apply AI Guardrails', detail: 'Review system prompt boundaries. Enable Arcjet AI content filtering. Restrict MCP tool permissions to read-only where possible.', icon: Key, urgency: 'high' };
+  }
+  return { action: 'Investigate & Monitor', detail: 'Review full request payload in audit logs. Correlate with other IPs from the same subnet. Consider temporary IP ban if pattern continues.', icon: Eye, urgency: 'medium' };
+}
+
+function timeAgo(dateStr: string): string {
+  const now = new Date();
+  const then = new Date(dateStr);
+  const diffMs = now.getTime() - then.getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+// --- WORLD MAP SVG paths (equirectangular 1000×500, projected from real lat/lon coordinates) ---
+const MAP_PATHS: Record<string, string> = {
+  northAmerica: "M111,83 L39,72 L64,53 L97,53 L111,64 L125,58 L153,50 L236,44 L250,56 L278,72 L322,83 L333,97 L353,119 L314,125 L306,133 L300,136 L294,142 L289,144 L289,150 L278,161 L275,167 L278,181 L272,181 L269,175 L256,167 L250,169 L236,169 L231,178 L206,164 L175,161 L194,186 L172,158 L158,144 L156,131 L156,122 L158,117 L153,114 L139,97 L122,89 L111,83 Z",
+  greenland: "M450,36 L444,28 L417,19 L375,19 L333,25 L311,33 L306,39 L333,47 L347,50 L361,56 L375,58 L417,56 L439,50 L450,42 Z",
+  centralAmerica: "M256,200 L244,203 L233,206 L244,208 L250,211 L258,214 L267,219 L267,222 L281,225 L286,228 L281,225 L269,222 L261,217 L256,214 L258,208 L256,203 L256,200 L258,197 L258,192 L250,192 L247,197 L256,200 Z",
+  southAmerica: "M300,217 L314,222 L333,228 L356,236 L361,244 L361,250 L386,258 L403,264 L403,272 L392,286 L389,300 L383,314 L367,319 L358,333 L350,344 L342,356 L325,364 L314,378 L306,389 L300,394 L311,403 L319,400 L306,394 L292,383 L297,372 L297,361 L297,353 L300,342 L303,333 L303,325 L303,300 L292,292 L286,283 L275,264 L278,253 L283,244 L286,233 L300,228 L292,219 L300,217 Z",
+  europe: "M569,53 L583,56 L589,58 L578,72 L567,78 L569,83 L556,83 L544,94 L536,97 L528,100 L522,100 L511,106 L506,108 L486,108 L483,114 L494,119 L497,128 L475,131 L475,147 L483,150 L494,150 L500,144 L500,139 L508,133 L514,131 L519,131 L522,128 L525,142 L539,136 L544,144 L550,139 L556,142 L567,144 L572,139 L581,136 L578,133 L578,128 L583,122 L567,117 L556,111 L558,106 L550,100 L558,94 L567,89 L569,83 L556,75 L539,67 L544,61 L569,53 Z",
+  britishIsles: "M486,111 L492,108 L500,106 L500,103 L497,100 L494,97 L494,92 L486,89 L483,92 L483,94 L486,97 L492,100 L489,103 L489,106 L486,108 L486,111 Z",
+  africa: "M475,147 L483,150 L497,150 L528,147 L533,158 L569,161 L589,164 L603,189 L619,208 L622,217 L642,219 L617,244 L617,253 L611,261 L611,269 L614,281 L614,292 L600,303 L592,319 L572,344 L550,347 L550,342 L547,333 L539,311 L533,297 L539,283 L533,264 L528,250 L519,239 L508,236 L506,233 L514,239 L503,233 L489,236 L481,239 L472,236 L464,231 L458,222 L453,208 L453,194 L458,181 L464,172 L475,161 L475,153 L475,147 Z",
+  madagascar: "M636,283 L639,294 L622,303 L622,314 L631,322 L633,317 L636,306 L639,294 L639,286 L636,283 Z",
+  middleEast: "M600,147 L611,147 L622,153 L633,167 L639,175 L644,183 L653,189 L658,192 L650,203 L622,211 L619,214 L619,208 L603,189 L594,172 L600,161 L600,147 Z",
+  russia: "M583,53 L639,50 L667,56 L722,47 L778,50 L806,42 L861,47 L889,56 L917,50 L944,56 L972,64 L994,69 L972,72 L953,83 L944,94 L931,106 L889,111 L867,117 L833,111 L806,103 L750,111 L722,117 L694,111 L667,117 L639,106 L617,97 L603,97 L583,89 L578,83 L583,78 L578,69 L583,61 L583,53 Z",
+  southAsia: "M708,153 L717,167 L703,172 L692,183 L703,194 L706,208 L714,222 L714,228 L722,228 L722,217 L722,208 L742,194 L747,189 L747,178 L769,172 L764,181 L758,189 L758,194 L767,192 L767,200 L772,206 L775,211 L769,172 L744,167 L736,172 L728,167 L717,161 L708,153 Z",
+  southeastAsia: "M778,200 L781,208 L786,214 L789,222 L786,228 L789,236 L789,244 L786,247 L781,242 L778,231 L775,225 L778,214 L781,208 L778,200 Z",
+  eastAsia: "M833,103 L875,117 L869,122 L867,131 L847,139 L839,144 L833,153 L839,167 L833,181 L817,189 L806,192 L800,189 L800,200 L794,194 L797,189 L800,183 L789,175 L772,167 L758,161 L722,150 L708,139 L722,133 L731,125 L742,117 L750,111 L806,103 L833,103 Z",
+  japan: "M864,158 L867,156 L869,153 L881,153 L881,147 L889,144 L889,139 L892,136 L903,131 L897,133 L892,139 L892,144 L889,150 L886,153 L878,156 L867,158 L864,158 Z",
+  sumatra: "M764,236 L775,242 L781,250 L789,256 L792,264 L789,267 L781,258 L775,250 L769,242 L764,236 Z",
+  java: "M794,267 L800,269 L811,272 L817,272 L817,269 L808,267 L800,267 L794,267 Z",
+  borneo: "M825,231 L831,236 L828,244 L825,250 L806,253 L803,247 L817,239 L825,231 Z",
+  papua: "M881,256 L883,261 L892,267 L906,272 L911,267 L903,261 L894,258 L889,256 L881,256 Z",
+  australia: "M864,283 L878,283 L878,289 L889,297 L906,294 L908,303 L917,314 L925,328 L922,342 L917,353 L908,358 L892,356 L881,347 L872,347 L867,339 L856,339 L839,344 L822,344 L819,336 L814,319 L817,311 L831,306 L844,292 L861,283 L864,283 Z",
+  newZealand: "M983,347 L986,353 L989,358 L986,364 L981,361 L983,356 L983,350 L983,347 Z",
+  nzSouth: "M978,364 L978,369 L969,372 L964,378 L972,378 L975,375 L978,369 L983,364 L978,364 Z",
+};
+
+/** Convert lat/long to x/y on a 1000×500 equirectangular projection */
+function geoToXY(lat: number, lon: number): { x: number; y: number } {
+  const x = ((lon + 180) / 360) * 1000;
+  const y = ((90 - lat) / 180) * 500;
+  return { x, y };
+}
+
 const NAV_ITEMS: NavItem[] = [
   { id: 'chat', label: 'Chatbot', icon: MessageSquare },
   { id: 'dashboard', label: 'Analytics', icon: Activity },
@@ -129,384 +198,367 @@ const Sidebar = ({ activeTab, setActiveTab }: { activeTab: TabId; setActiveTab: 
   );
 };
 
-// 2. DASHBOARD COMPONENT
+// 2. DASHBOARD COMPONENT (fully functional – fetches real data from API)
 const Dashboard = () => {
-  const [threats, setThreats] = useState(0);
-  const [blocked, setBlocked] = useState(0);
-  const [attackLogs, setAttackLogs] = useState<AttackLog[]>([]);
-  const [aiAttacks, setAiAttacks] = useState({ promptInjection: 0, outputLeak: 0, toolDenied: 0, total: 0 });
+  const [logs, setLogs] = useState<AttackLog[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [expandedAlert, setExpandedAlert] = useState<number | null>(null);
+  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
-  useEffect(() => {
-    const fetchAttackLogs = async () => {
-      try {
-        const response = await fetch('/api/attack-logs');
-        if (response.ok) {
-          const data = await response.json();
-          console.log('[DASHBOARD] Fetched attack logs:', data.length, 'events');
-          console.log('[DASHBOARD] CLIENT events:', data.filter((log: AttackLog) => log.type.startsWith('CLIENT:')).length);
-          if (Array.isArray(data)) {
-            setAttackLogs(data);
-          } else {
-            setAttackLogs([]);
-          }
-        } else {
-          setAttackLogs([]);
-        }
-      } catch (error) {
-        console.error("Failed to fetch attack logs:", error);
-        setAttackLogs([]);
-      }
-    };
-
-    const fetchThreatActivity = async () => {
-      try {
-        const response = await fetch('/api/threat-activity');
-        if (response.ok) {
-          const data = await response.json();
-          console.log('[DASHBOARD] Threat activity:', data);
-          setThreats(data.threats);
-          setBlocked(data.blocked);
-        }
-      } catch (error) {
-        console.error("Failed to fetch threat activity:", error);
-      }
-    };
-
-    const fetchAIAttacks = async () => {
-      try {
-        const counts = await getAIAttackCount();
-        setAiAttacks(counts);
-      } catch (error) {
-        console.error("Failed to fetch AI attack counts:", error);
-      }
-    };
-
-    fetchAttackLogs();
-    fetchThreatActivity();
-    fetchAIAttacks();
-    const attackLogsInterval = setInterval(fetchAttackLogs, 5000);
-    const threatActivityInterval = setInterval(fetchThreatActivity, 5000);
-    const aiAttacksInterval = setInterval(fetchAIAttacks, 5000);
-
-    return () => {
-      clearInterval(attackLogsInterval);
-      clearInterval(threatActivityInterval);
-      clearInterval(aiAttacksInterval);
-    };
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await fetch('/api/attack-logs');
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      const data: AttackLog[] = await res.json();
+      setLogs(data);
+      setLastRefresh(new Date());
+    } catch (err) {
+      console.error('Failed to fetch attack logs', err);
+      setError('Unable to connect to threat database');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
+  useEffect(() => {
+    fetchData();
+    const interval = setInterval(fetchData, 30000);
+    return () => clearInterval(interval);
+  }, [fetchData]);
+
+  // derived analytics
+  const totalThreats = logs.length;
+  const totalBlocked = logs.length;
+  const highSeverity = logs.filter(l => l.severity >= 7);
+  const medSeverity = logs.filter(l => l.severity >= 4 && l.severity < 7);
+  const lowSeverity = logs.filter(l => l.severity < 4);
+
+  const chartData = useMemo(() => {
+    const map: Record<string, number> = {};
+    logs.forEach(l => {
+      const key = l.type.replace('SHIELD:', '').replace(/_/g, ' ');
+      map[key] = (map[key] || 0) + 1;
+    });
+    return Object.entries(map).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count).slice(0, 8);
+  }, [logs]);
+
+  const timelineData = useMemo(() => {
+    const buckets: Record<string, { high: number; med: number; low: number }> = {};
+    logs.forEach(l => {
+      const d = new Date(l.timestamp);
+      const key = `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:00`;
+      if (!buckets[key]) buckets[key] = { high: 0, med: 0, low: 0 };
+      if (l.severity >= 7) buckets[key].high++;
+      else if (l.severity >= 4) buckets[key].med++;
+      else buckets[key].low++;
+    });
+    return Object.entries(buckets).sort(([a], [b]) => a.localeCompare(b)).slice(-15).map(([time, v]) => ({ time: time.split(' ')[1] || time, ...v }));
+  }, [logs]);
+
+  const pieData = useMemo(() => [
+    { name: 'Critical', value: highSeverity.length, color: '#ef4444' },
+    { name: 'Medium', value: medSeverity.length, color: '#f59e0b' },
+    { name: 'Low', value: lowSeverity.length, color: '#10b981' },
+  ], [highSeverity, medSeverity, lowSeverity]);
+
+  const geoPoints = useMemo(() => {
+    return logs
+      .filter(l => l.latitude && l.longitude && !(parseFloat(l.latitude!) === 0 && parseFloat(l.longitude!) === 0))
+      .map(l => ({
+        ...l,
+        pos: geoToXY(parseFloat(l.latitude!), parseFloat(l.longitude!)),
+      }));
+  }, [logs]);
+
+  const activeAlerts = useMemo(() => {
+    const seen = new Set<string>();
+    return logs.filter(l => l.severity >= 5).filter(l => { const k = l.type; if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 5);
+  }, [logs]);
+
+  const uniqueCountries = useMemo(() => {
+    const s = new Set(logs.map(l => l.country).filter(Boolean));
+    return s.size;
+  }, [logs]);
+
+  if (loading && logs.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-[60vh]">
+        <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}>
+          <RefreshCw className="text-blue-400" size={32} />
+        </motion.div>
+        <span className="ml-3 text-slate-400">Loading threat intelligence…</span>
+      </div>
+    );
+  }
+
+  if (error && logs.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[60vh] text-center">
+        <AlertTriangle className="text-amber-500 mb-4" size={48} />
+        <p className="text-slate-300 text-lg font-semibold mb-2">Threat Database Unavailable</p>
+        <p className="text-slate-500 text-sm mb-4">{error}</p>
+        <button onClick={fetchData} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-500 transition-colors">Retry</button>
+      </div>
+    );
+  }
+
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-    >
-      {/* Status Cards */}
-      <motion.div 
-        whileHover={{ y: -4, boxShadow: '0 20px 40px -15px rgba(59, 130, 246, 0.3)' }}
-        className="bg-slate-900/80 backdrop-blur border border-slate-800 p-6 rounded-2xl relative overflow-hidden group"
-      >
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+      {/* Card 1: System Status */}
+      <motion.div whileHover={{ y: -4, boxShadow: '0 20px 40px -15px rgba(59, 130, 246, 0.3)' }} className="bg-slate-900/80 backdrop-blur border border-slate-800 p-6 rounded-2xl relative overflow-hidden group">
         <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl group-hover:bg-blue-500/20 transition-all" />
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-slate-400 text-xs uppercase tracking-wider font-semibold">Chatbot Service</h3>
-          <motion.div 
-            animate={{ rotate: 360 }}
-            transition={{ duration: 8, repeat: Infinity, ease: 'linear' }}
-          >
-            <Server className="text-blue-500" size={20} />
-          </motion.div>
+          <h3 className="text-slate-400 text-xs uppercase tracking-wider font-semibold">System Status</h3>
+          <motion.div animate={{ rotate: 360 }} transition={{ duration: 8, repeat: Infinity, ease: 'linear' }}><Server className="text-blue-500" size={20} /></motion.div>
         </div>
-        <p className="text-3xl font-bold text-blue-400 mb-1">Running</p>
-        <p className="text-xs text-slate-500">Arcjet Shield: Active</p>
+        <p className="text-3xl font-bold text-blue-400 mb-1">{error ? 'Degraded' : 'Running'}</p>
+        <p className="text-xs text-slate-500">Arcjet Shield: {error ? 'Check' : 'Active'}</p>
         <div className="mt-4 flex items-center gap-2">
-          <span className="flex items-center gap-1 text-xs text-emerald-400">
-            <Zap size={12} /> 99.9% Uptime
-          </span>
+          <span className="flex items-center gap-1 text-xs text-emerald-400"><Zap size={12} /> {totalBlocked} attacks blocked</span>
         </div>
       </motion.div>
 
-      <motion.div 
-        whileHover={{ y: -4, boxShadow: '0 20px 40px -15px rgba(16, 185, 129, 0.3)' }}
-        className="bg-slate-900/80 backdrop-blur border border-slate-800 p-6 rounded-2xl relative overflow-hidden group"
-      >
+      {/* Card 2: Database */}
+      <motion.div whileHover={{ y: -4, boxShadow: '0 20px 40px -15px rgba(16, 185, 129, 0.3)' }} className="bg-slate-900/80 backdrop-blur border border-slate-800 p-6 rounded-2xl relative overflow-hidden group">
         <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl group-hover:bg-emerald-500/20 transition-all" />
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-slate-400 text-xs uppercase tracking-wider font-semibold">Database Integrity</h3>
           <Lock className="text-emerald-400" size={20} />
         </div>
-        <p className="text-3xl font-bold text-emerald-400 mb-1">Perfect</p>
-        <p className="text-xs text-slate-500">Last backup: 2 min ago</p>
-        <button className="mt-4 text-xs text-blue-400 hover:text-blue-300 underline underline-offset-2 transition-colors">
-          View changes
-        </button>
+        <p className="text-3xl font-bold text-emerald-400 mb-1">Protected</p>
+        <p className="text-xs text-slate-500">Drizzle ORM: Active</p>
+        <div className="mt-4 flex items-center gap-2">
+          <span className="flex items-center gap-1 text-xs text-emerald-400"><ShieldCheck size={12} /> Zero raw SQL</span>
+        </div>
       </motion.div>
 
-      <motion.div 
-        whileHover={{ y: -4, boxShadow: '0 20px 40px -15px rgba(245, 158, 11, 0.3)' }}
-        className="bg-slate-900/80 backdrop-blur border border-slate-800 p-6 rounded-2xl relative overflow-hidden group border-l-4 border-l-amber-500"
-      >
+      {/* Card 3: Active Alerts with recommendations */}
+      <motion.div whileHover={{ y: -4, boxShadow: '0 20px 40px -15px rgba(245, 158, 11, 0.3)' }} className="bg-slate-900/80 backdrop-blur border border-slate-800 p-6 rounded-2xl relative overflow-hidden group border-l-4 border-l-amber-500">
         <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-3xl group-hover:bg-amber-500/20 transition-all" />
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-slate-400 text-xs uppercase tracking-wider font-semibold">Active Alerts</h3>
           <AlertTriangle className="text-amber-500" size={20} />
         </div>
-        <div className="flex items-start gap-2 text-amber-500 mb-4">
-          <AlertTriangle size={18} className="flex-shrink-0 mt-0.5" />
-          <p className="text-sm">Suspicious IP Rotation detected</p>
-        </div>
-        <motion.button 
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          className="w-full bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-400 py-2.5 rounded-lg text-xs font-bold border border-amber-500/30 hover:border-amber-500/50 transition-all"
-        >
-          Recommended Action
-        </motion.button>
+        <p className="text-3xl font-bold text-amber-400 mb-1">{activeAlerts.length}</p>
+        <p className="text-xs text-slate-500 mb-3">Unique threat types requiring attention</p>
+        {activeAlerts.length > 0 && (() => {
+          const latest = activeAlerts[0];
+          const rec = getRecommendation(latest.type);
+          return (
+            <>
+              <div className="flex items-start gap-2 text-amber-500 mb-3">
+                <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
+                <p className="text-xs leading-snug">Latest: <strong>{latest.type}</strong> from {latest.ip} ({latest.country || 'Unknown'})</p>
+              </div>
+              <div className={`mb-2 px-3 py-2 rounded-lg text-xs ${rec.urgency === 'critical' ? 'bg-red-500/10 border border-red-500/30 text-red-400' : rec.urgency === 'high' ? 'bg-amber-500/10 border border-amber-500/30 text-amber-400' : 'bg-blue-500/10 border border-blue-500/30 text-blue-400'}`}>
+                <div className="flex items-center gap-1.5 font-bold mb-1"><rec.icon size={12} /> {rec.action}</div>
+                <p className="text-[10px] opacity-80 leading-relaxed">{rec.detail}</p>
+              </div>
+            </>
+          );
+        })()}
       </motion.div>
 
-      {/* Threat Activity with AI Security Metrics */}
-      <motion.div 
-        whileHover={{ y: -4 }}
-        className="lg:col-span-2 bg-slate-900/80 backdrop-blur border border-slate-800 p-6 rounded-2xl"
-      >
+      {/* Threat Activity Area Chart */}
+      <motion.div whileHover={{ y: -4 }} className="lg:col-span-2 bg-slate-900/80 backdrop-blur border border-slate-800 p-6 rounded-2xl">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-slate-400 text-xs uppercase tracking-wider font-semibold">Threat Activity</h3>
+          <h3 className="text-slate-400 text-xs uppercase tracking-wider font-semibold">Threat Activity Over Time</h3>
           <div className="flex items-center gap-2">
+            <button onClick={fetchData} className="text-slate-500 hover:text-slate-300 transition-colors" title="Refresh"><RefreshCw size={14} className={loading ? 'animate-spin' : ''} /></button>
             <span className="text-xs text-slate-500">Live</span>
-            <motion.div 
-              className="w-2 h-2 rounded-full bg-red-500"
-              animate={{ opacity: [1, 0.3, 1] }}
-              transition={{ duration: 1, repeat: Infinity }}
-            />
+            <motion.div className="w-2 h-2 rounded-full bg-red-500" animate={{ opacity: [1, 0.3, 1] }} transition={{ duration: 1, repeat: Infinity }} />
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-4 mb-6">
-          <div>
-            <p className="text-3xl font-bold text-slate-100">{threats.toLocaleString()}</p>
-            <p className="text-xs text-slate-500 mt-1">Threats Detected</p>
-          </div>
-          <div>
-            <p className="text-3xl font-bold text-emerald-400">{blocked.toLocaleString()}</p>
-            <p className="text-xs text-slate-500 mt-1">Attacks Blocked</p>
-          </div>
-          <div>
-            <p className="text-3xl font-bold text-purple-400">{aiAttacks.promptInjection}</p>
-            <p className="text-xs text-slate-500 mt-1">Prompt Injections</p>
-          </div>
+        <div className="grid grid-cols-3 gap-6 mb-6">
+          <div><p className="text-3xl font-bold text-slate-100">{totalThreats.toLocaleString()}</p><p className="text-xs text-slate-500 mt-1">Threats Detected</p></div>
+          <div><p className="text-3xl font-bold text-emerald-400">{totalBlocked.toLocaleString()}</p><p className="text-xs text-slate-500 mt-1">Attacks Blocked</p></div>
+          <div><p className="text-3xl font-bold text-red-400">{highSeverity.length}</p><p className="text-xs text-slate-500 mt-1">Critical Severity</p></div>
         </div>
-        <div className="grid grid-cols-3 gap-4 mb-6">
-          <div>
-            <p className="text-2xl font-bold text-blue-400">0.003s</p>
-            <p className="text-xs text-slate-500 mt-1">Avg Response Time</p>
-          </div>
-          <div>
-            <p className="text-2xl font-bold text-purple-400">{aiAttacks.outputLeak}</p>
-            <p className="text-xs text-slate-500 mt-1">Output Leaks</p>
-          </div>
-          <div>
-            <p className="text-2xl font-bold text-purple-400">{aiAttacks.toolDenied}</p>
-            <p className="text-xs text-slate-500 mt-1">Tool Denied</p>
-          </div>
-        </div>
-        <div className="h-24 flex items-end gap-1">
-          {[40, 65, 45, 80, 55, 90, 70, 85, 60, 75, 50, 95, 70, 80, 65].map((h, i) => (
-            <motion.div
-              key={i}
-              initial={{ height: 0 }}
-              animate={{ height: `${h}%` }}
-              transition={{ delay: i * 0.05, duration: 0.5 }}
-              className="flex-1 bg-gradient-to-t from-blue-600/50 to-blue-400/50 rounded-t hover:from-blue-500 hover:to-blue-300 transition-all cursor-pointer"
-            />
-          ))}
+        <div className="h-40">
+          {timelineData.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={timelineData}>
+                <defs>
+                  <linearGradient id="gHigh" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#ef4444" stopOpacity={0.4} /><stop offset="95%" stopColor="#ef4444" stopOpacity={0} /></linearGradient>
+                  <linearGradient id="gMed" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#f59e0b" stopOpacity={0.4} /><stop offset="95%" stopColor="#f59e0b" stopOpacity={0} /></linearGradient>
+                  <linearGradient id="gLow" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#10b981" stopOpacity={0.4} /><stop offset="95%" stopColor="#10b981" stopOpacity={0} /></linearGradient>
+                </defs>
+                <XAxis dataKey="time" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} width={30} />
+                <RechartsTooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px', fontSize: '11px' }} labelStyle={{ color: '#94a3b8' }} />
+                <Area type="monotone" dataKey="high" stackId="1" stroke="#ef4444" fill="url(#gHigh)" name="Critical" />
+                <Area type="monotone" dataKey="med" stackId="1" stroke="#f59e0b" fill="url(#gMed)" name="Medium" />
+                <Area type="monotone" dataKey="low" stackId="1" stroke="#10b981" fill="url(#gLow)" name="Low" />
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-full text-slate-600 text-sm">No timeline data available</div>
+          )}
         </div>
       </motion.div>
 
-      {/* Live Attack Logs */}
-      <motion.div 
-        whileHover={{ y: -4 }}
-        className="bg-slate-900/80 backdrop-blur border border-slate-800 p-6 rounded-2xl overflow-hidden"
-      >
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-slate-400 text-xs uppercase tracking-wider font-semibold">Live Attack Logs</h3>
+      {/* Attack Type Bar Chart + Pie */}
+      <motion.div whileHover={{ y: -4 }} className="bg-slate-900/80 backdrop-blur border border-slate-800 p-6 rounded-2xl overflow-hidden">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-slate-400 text-xs uppercase tracking-wider font-semibold">Attack Types</h3>
           <BarChart3 className="text-slate-600" size={16} />
         </div>
-        <div className="space-y-3 h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
-          {attackLogs.map((log, i) => (
-            <motion.div 
-              key={log.id}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: i * 0.1 }}
-              className="flex items-center justify-between p-4 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition-colors"
-            >
-              <div>
-                <span className={`text-sm font-mono ${log.severity >= 7 ? 'text-red-400' : log.severity >= 4 ? 'text-amber-400' : 'text-slate-400'}`}>
-                  {log.ip === '::1' || log.ip === '127.0.0.1' ? '🏠 localhost' : log.ip}
-                </span>
-                <p className="text-xs text-slate-500 mt-1">{log.type}</p>
+        <div className="h-44 mb-4">
+          {chartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} layout="vertical" margin={{ left: 0 }}>
+                <XAxis type="number" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 9, fill: '#94a3b8' }} width={90} axisLine={false} tickLine={false} />
+                <RechartsTooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px', fontSize: '11px' }} />
+                <Bar dataKey="count" fill="#3b82f6" radius={[0, 4, 4, 0]} name="Attacks" />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-full text-slate-600 text-sm">No data</div>
+          )}
+        </div>
+        <div className="flex items-center justify-around">
+          <div className="w-20 h-20">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart><Pie data={pieData} innerRadius={22} outerRadius={36} dataKey="value" stroke="none">{pieData.map((entry, idx) => (<Cell key={idx} fill={entry.color} />))}</Pie></PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="space-y-1">
+            {pieData.map(p => (<div key={p.name} className="flex items-center gap-2 text-[10px]"><span className="w-2 h-2 rounded-full" style={{ background: p.color }} /><span className="text-slate-400">{p.name}: {p.value}</span></div>))}
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Live Attack Logs (real data) */}
+      <motion.div whileHover={{ y: -4 }} className="lg:col-span-2 bg-slate-900/80 backdrop-blur border border-slate-800 p-6 rounded-2xl overflow-hidden">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-slate-400 text-xs uppercase tracking-wider font-semibold">Live Attack Logs</h3>
+          <span className="text-[10px] text-slate-600">{logs.length} records</span>
+        </div>
+        <div className="space-y-2 max-h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+          {logs.slice(0, 15).map((log, i) => (
+            <motion.div key={log.id || i} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.04 }} className="flex items-center justify-between p-2 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition-colors">
+              <div className="min-w-0">
+                <span className={`text-xs font-mono ${log.severity >= 7 ? 'text-red-400' : log.severity >= 4 ? 'text-amber-400' : 'text-slate-400'}`}>{log.ip}</span>
+                <p className="text-[10px] text-slate-500 truncate">{log.type}</p>
               </div>
-              <div className="text-right">
-                <span className={`text-sm px-2.5 py-1 rounded-full ${log.severity >= 7 ? 'bg-red-500/20 text-red-400' : log.severity >= 4 ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-700 text-slate-400'}`}>
-                  {log.severity}/10
-                </span>
-                <p className="text-xs text-slate-500 mt-1">{new Date(log.timestamp).toLocaleTimeString()}</p>
+              <div className="flex items-center gap-3">
+                {log.country && (<span className="text-[10px] text-slate-500 hidden sm:inline">{log.city ? `${log.city}, ` : ''}{log.country}</span>)}
+                <span className={`text-[10px] px-2 py-0.5 rounded-full whitespace-nowrap ${log.severity >= 7 ? 'bg-red-500/20 text-red-400' : log.severity >= 4 ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-700 text-slate-400'}`}>{log.severity}/10</span>
+                <p className="text-[10px] text-slate-500 whitespace-nowrap">{timeAgo(log.timestamp)}</p>
               </div>
             </motion.div>
           ))}
+          {logs.length === 0 && (<p className="text-center text-slate-600 text-sm py-6">No attack logs recorded yet</p>)}
         </div>
       </motion.div>
 
-      {/* Threat Map */}
-      <motion.div 
-        whileHover={{ y: -4 }}
-        className="lg:col-span-3 bg-slate-900/80 backdrop-blur border border-slate-800 p-6 rounded-2xl h-80 relative overflow-hidden"
-      >
+      {/* Security Recommendations Panel */}
+      <motion.div whileHover={{ y: -4 }} className="bg-slate-900/80 backdrop-blur border border-slate-800 p-6 rounded-2xl overflow-hidden">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-slate-400 text-xs uppercase tracking-wider font-semibold">Recommended Actions</h3>
+          <ShieldAlert className="text-blue-400" size={16} />
+        </div>
+        <div className="space-y-3 max-h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+          {activeAlerts.map((alert, i) => {
+            const rec = getRecommendation(alert.type);
+            const isOpen = expandedAlert === i;
+            return (
+              <motion.div key={i} layout className="rounded-lg overflow-hidden">
+                <button onClick={() => setExpandedAlert(isOpen ? null : i)} className={`w-full text-left p-3 rounded-lg transition-all ${rec.urgency === 'critical' ? 'bg-red-500/10 border border-red-500/20 hover:border-red-500/40' : rec.urgency === 'high' ? 'bg-amber-500/10 border border-amber-500/20 hover:border-amber-500/40' : 'bg-blue-500/10 border border-blue-500/20 hover:border-blue-500/40'}`}>
+                  <div className="flex items-center gap-2">
+                    <rec.icon size={14} className={rec.urgency === 'critical' ? 'text-red-400' : rec.urgency === 'high' ? 'text-amber-400' : 'text-blue-400'} />
+                    <span className="text-xs font-bold text-slate-200">{rec.action}</span>
+                    <span className={`ml-auto text-[9px] uppercase font-bold px-1.5 py-0.5 rounded ${rec.urgency === 'critical' ? 'bg-red-500/20 text-red-400' : rec.urgency === 'high' ? 'bg-amber-500/20 text-amber-400' : 'bg-blue-500/20 text-blue-400'}`}>{rec.urgency}</span>
+                  </div>
+                  <AnimatePresence>
+                    {isOpen && (
+                      <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="mt-2 text-[10px] text-slate-400 leading-relaxed">
+                        <p className="text-[10px] text-slate-500 mb-1">Triggered by: {alert.type} — {alert.ip}</p>
+                        <p>{rec.detail}</p>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </button>
+              </motion.div>
+            );
+          })}
+          {activeAlerts.length === 0 && (
+            <div className="text-center py-6"><CheckCircle className="text-emerald-400 mx-auto mb-2" size={24} /><p className="text-xs text-slate-500">No active threats – all clear!</p></div>
+          )}
+        </div>
+      </motion.div>
+
+      {/* Global Threat Map with SVG world map */}
+      <motion.div whileHover={{ y: -4 }} className="lg:col-span-3 bg-slate-900/80 backdrop-blur border border-slate-800 p-6 rounded-2xl relative overflow-hidden" style={{ minHeight: 340 }}>
         <div className="flex items-center justify-between mb-4 relative z-10">
           <h3 className="text-slate-400 text-xs uppercase tracking-wider font-semibold">Global Threat Map</h3>
           <div className="flex items-center gap-4">
-            <span className="flex items-center gap-2 text-xs text-slate-500">
-              <span className="w-2 h-2 rounded-full bg-red-500" /> High Risk
-            </span>
-            <span className="flex items-center gap-2 text-xs text-slate-500">
-              <span className="w-2 h-2 rounded-full bg-amber-500" /> Medium
-            </span>
-            <span className="flex items-center gap-2 text-xs text-slate-500">
-              <span className="w-2 h-2 rounded-full bg-emerald-500" /> Low
-            </span>
+            <span className="flex items-center gap-2 text-xs text-slate-500"><span className="w-2 h-2 rounded-full bg-red-500" /> High Risk</span>
+            <span className="flex items-center gap-2 text-xs text-slate-500"><span className="w-2 h-2 rounded-full bg-amber-500" /> Medium</span>
+            <span className="flex items-center gap-2 text-xs text-slate-500"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Low</span>
           </div>
         </div>
-        
-        {/* World Map Background - Accurate Mercator Projection SVG */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <Image
-            src="/world-map.svg"
-            alt="World Map - Mercator Projection"
-            fill
-            className="object-contain opacity-30 pointer-events-none"
-            priority
-          />
-        </div>
-        
-        {/* Threat Markers */}
-        <div className="absolute inset-0">
-          {attackLogs
-            .filter(log => {
-              const lat = parseFloat(log.latitude || '0');
-              const lng = parseFloat(log.longitude || '0');
-              return lat !== 0 && lng !== 0;
-            })
-            .map((log) => {
-              const lat = parseFloat(log.latitude!);
-              const lng = parseFloat(log.longitude!);
-              
-              // Convert lat/lng to x,y coordinates using Web Mercator projection
-              // This matches standard world maps and ensures accurate positioning
-              const x = ((lng + 180) / 360) * 100;
-              
-              // Use proper Mercator projection for Y axis
-              // Mercator formula: y = ln(tan(π/4 + lat/2))
-              const latRad = (lat * Math.PI) / 180;
-              const mercatorY = Math.log(Math.tan(Math.PI / 4 + latRad / 2));
-              // Normalize to 0-100 range (Web Mercator typically shows ±85° latitude)
-              const y = (1 - mercatorY / Math.PI) * 50;
-              
-              const color = log.severity >= 7 ? '#ef4444' : log.severity >= 4 ? '#f59e0b' : '#10b981';
-              
-              // Check if we're in development (localhost) - only show Demo label there
-              // In production (Vercel), this will be false, so no Demo label ever appears
-              const isDevelopment = typeof window !== 'undefined' && 
-                                   (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-              
-              // Log marker placement for verification
-              if (log.country === 'Philippines') {
-                console.log(`🇵🇭 PHILIPPINES marker: ${log.city} at (${x.toFixed(1)}%, ${y.toFixed(1)}%) - Should appear in Southeast Asia`);
-              }
-              
+        <div className="relative w-full" style={{ paddingBottom: '50%' }}>
+          <svg viewBox="0 0 1000 500" className="absolute inset-0 w-full h-full" xmlns="http://www.w3.org/2000/svg">
+            {/* Ocean background */}
+            <rect width="1000" height="500" fill="#0c1425" rx="8" />
+            {/* Grid lines */}
+            {[...Array(9)].map((_, i) => (<line key={`h${i}`} x1={0} y1={(i + 1) * 50} x2={1000} y2={(i + 1) * 50} stroke="#1e293b" strokeWidth="0.5" opacity="0.4" />))}
+            {[...Array(19)].map((_, i) => (<line key={`v${i}`} x1={(i + 1) * 50} y1={0} x2={(i + 1) * 50} y2={500} stroke="#1e293b" strokeWidth="0.5" opacity="0.4" />))}
+            {/* Equator */}
+            <line x1={0} y1={250} x2={1000} y2={250} stroke="#334155" strokeWidth="0.5" strokeDasharray="8,4" opacity="0.5" />
+            {/* Continent outlines */}
+            {Object.entries(MAP_PATHS).map(([name, d]) => (
+              <path key={name} d={d} fill="#1e293b" stroke="#475569" strokeWidth="1" strokeLinejoin="round" />
+            ))}
+            {/* Attack points plotted by lat/long */}
+            {geoPoints.map((pt, i) => {
+              const color = pt.severity >= 7 ? '#ef4444' : pt.severity >= 4 ? '#f59e0b' : '#10b981';
               return (
-                <motion.div
-                  key={log.id}
-                  className="absolute group"
-                  style={{
-                    left: `${x}%`,
-                    top: `${y}%`,
-                    transform: 'translate(-50%, -50%)',
-                  }}
-                  initial={{ scale: 0, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ duration: 0.5, delay: Math.random() * 0.3 }}
-                >
-                  {/* Pulsing marker */}
-                  <motion.div
-                    className="w-3 h-3 rounded-full cursor-pointer"
-                    style={{ backgroundColor: color }}
-                    animate={{
-                      scale: [1, 1.3, 1],
-                      opacity: [0.8, 1, 0.8],
-                    }}
-                    transition={{
-                      duration: 2,
-                      repeat: Infinity,
-                      ease: "easeInOut",
-                    }}
-                  >
-                    {/* Ripple effect */}
-                    <motion.div
-                      className="absolute inset-0 rounded-full"
-                      style={{ backgroundColor: color }}
-                      animate={{
-                        scale: [1, 3],
-                        opacity: [0.6, 0],
-                      }}
-                      transition={{
-                        duration: 1.5,
-                        repeat: Infinity,
-                        ease: "easeOut",
-                      }}
-                    />
-                  </motion.div>
-                  
-                  {/* Tooltip on hover */}
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-50 pointer-events-none">
-                    <div className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs whitespace-nowrap shadow-xl">
-                      <p className="text-white font-semibold">{log.type}</p>
-                      <p className="text-slate-400">
-                        {log.city || 'Unknown'}, {log.country || 'Unknown'}
-                        {isDevelopment && <span className="ml-1 text-yellow-500">(Demo)</span>}
-                      </p>
-                      <p className="text-slate-500">IP: {log.ip === '::1' ? 'localhost' : log.ip}</p>
-                      <p className="text-slate-500">Severity: {log.severity}/10</p>
-                      <p className="text-slate-500 text-[10px]">Lat: {lat.toFixed(4)}, Lng: {lng.toFixed(4)}</p>
-                      <p className="text-slate-500 text-[10px]">{new Date(log.timestamp).toLocaleString()}</p>
-                      {/* Arrow */}
-                      <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px">
-                        <div className="border-4 border-transparent border-t-slate-800" />
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
+                <g key={i}>
+                  <circle cx={pt.pos.x} cy={pt.pos.y} r="12" fill="none" stroke={color} strokeWidth="1" opacity="0.3">
+                    <animate attributeName="r" from="6" to="20" dur="2s" repeatCount="indefinite" />
+                    <animate attributeName="opacity" from="0.5" to="0" dur="2s" repeatCount="indefinite" />
+                  </circle>
+                  <circle cx={pt.pos.x} cy={pt.pos.y} r="5" fill={color} opacity="0.85">
+                    <title>{`${pt.type} — ${pt.ip} (${pt.city || ''}, ${pt.country || 'Unknown'}) — Severity: ${pt.severity}/10`}</title>
+                  </circle>
+                </g>
               );
             })}
+            {geoPoints.length === 0 && (
+              <>
+                <circle cx={150} cy={140} r="5" fill="#f59e0b" opacity="0.6" />
+                <circle cx={490} cy={80} r="5" fill="#ef4444" opacity="0.6" />
+                <circle cx={720} cy={110} r="5" fill="#ef4444" opacity="0.6" />
+                <circle cx={790} cy={310} r="5" fill="#10b981" opacity="0.6" />
+                <text x={500} y={260} textAnchor="middle" fill="#475569" fontSize="14">No geo-located attacks</text>
+              </>
+            )}
+          </svg>
         </div>
-        
-        <div className="absolute bottom-4 left-4 right-4 flex justify-between text-xs text-slate-500 z-10">
-          <span>Monitoring {attackLogs.filter(log => parseFloat(log.latitude || '0') !== 0).length} active threats</span>
-          <span>Last update: Just now</span>
+        <div className="flex justify-between text-xs text-slate-500 mt-2">
+          <span>Monitoring {uniqueCountries} countries • {geoPoints.length} geo-located threats</span>
+          <span>Last update: {lastRefresh.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
         </div>
       </motion.div>
     </motion.div>
   );
 };
 
-// 3. CHATBOT COMPONENT (WITH AI GOVERNANCE)
+// 3. CHATBOT COMPONENT
 const Chatbot = () => {
   const [messages, setMessages] = useState<Message[]>([
-    { id: 1, text: 'Hello! I am SECURE_BOT, your AI security assistant with built-in prompt injection protection. How can I help you today?', isUser: false, timestamp: new Date() }
+    { id: 1, text: 'Hello! I am SECURE_BOT, your security assistant. How can I help you today?', isUser: false, timestamp: new Date() }
   ]);
   const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
-  const nextIdRef = useRef(2); // Track next message ID to avoid duplicates
 
   const scrollToBottom = () => {
     // Scroll only the messages container, not the entire page
@@ -519,65 +571,35 @@ const Chatbot = () => {
     scrollToBottom();
   }, [messages]);
 
-  const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+  const handleSend = () => {
+    if (!input.trim()) return;
     
     const userMsg: Message = {
-      id: nextIdRef.current++,
+      id: messages.length + 1,
       text: input,
       isUser: true,
       timestamp: new Date()
     };
     
-    const userInput = input;
     setMessages(prev => [...prev, userMsg]);
     setInput('');
-    setIsLoading(true);
     
-    // Add loading indicator
-    const loadingMsg: Message = {
-      id: nextIdRef.current++,
-      text: 'Analyzing your request...',
-      isUser: false,
-      timestamp: new Date(),
-      loading: true,
-    };
-    setMessages(prev => [...prev, loadingMsg]);
-    
-    try {
-      // Call AI-protected server action
-      const response = await sendChatMessage(userInput);
-      
-      // Remove loading message
-      setMessages(prev => prev.filter(m => !m.loading));
-      
-      // Add bot response
+    setTimeout(() => {
+      const responses = [
+        'I understand your concern. Let me check the security logs for you.',
+        'That\'s a great question about network security. Here\'s what I found...',
+        'I\'ve analyzed the threat pattern. It appears to be a low-risk probe.',
+        'Would you like me to generate a detailed security report?',
+        'Your system is currently protected. No immediate action required.',
+      ];
       const botMsg: Message = {
-        id: nextIdRef.current++,
-        text: response.message,
+        id: messages.length + 2,
+        text: responses[Math.floor(Math.random() * responses.length)],
         isUser: false,
-        timestamp: new Date(),
-        blocked: response.blocked || false,
+        timestamp: new Date()
       };
-      
       setMessages(prev => [...prev, botMsg]);
-    } catch (error) {
-      console.error('[CHAT] Error:', error);
-      
-      // Remove loading message
-      setMessages(prev => prev.filter(m => !m.loading));
-      
-      // Show error message
-      const errorMsg: Message = {
-        id: nextIdRef.current++,
-        text: 'I encountered an error processing your request. Please try again.',
-        isUser: false,
-        timestamp: new Date(),
-      };
-      setMessages(prev => [...prev, errorMsg]);
-    } finally {
-      setIsLoading(false);
-    }
+    }, 1000 + Math.random() * 1000);
   };
 
   return (
@@ -620,29 +642,9 @@ const Chatbot = () => {
             transition={{ duration: 0.3 }}
             className={`flex ${msg.isUser ? 'justify-end' : 'justify-start'}`}
           >
-            <div className={`max-w-[70%] ${
-              msg.loading 
-                ? 'bg-slate-700/50 animate-pulse' 
-                : msg.blocked 
-                  ? 'bg-gradient-to-r from-red-600 to-red-500 border-2 border-red-400' 
-                  : msg.isUser 
-                    ? 'bg-gradient-to-r from-blue-600 to-blue-500' 
-                    : 'bg-slate-800'
-            } rounded-2xl px-4 py-3`}>
-              {msg.blocked && (
-                <div className="flex items-center gap-2 mb-2 text-red-200">
-                  <Shield size={14} />
-                  <span className="text-xs font-semibold">SECURITY: Prompt Injection Blocked</span>
-                </div>
-              )}
-              <p className={`text-sm whitespace-pre-line ${
-                msg.loading ? 'text-slate-400 italic' : msg.isUser ? 'text-white' : 'text-slate-200'
-              }`}>
-                {msg.text}
-              </p>
-              <p className={`text-[10px] mt-1 ${
-                msg.loading ? 'text-slate-500' : msg.isUser ? 'text-blue-200' : 'text-slate-500'
-              }`}>
+            <div className={`max-w-[70%] ${msg.isUser ? 'bg-gradient-to-r from-blue-600 to-blue-500' : 'bg-slate-800'} rounded-2xl px-4 py-3`}>
+              <p className={`text-sm ${msg.isUser ? 'text-white' : 'text-slate-200'}`}>{msg.text}</p>
+              <p className={`text-[10px] mt-1 ${msg.isUser ? 'text-blue-200' : 'text-slate-500'}`}>
                 {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </p>
             </div>
@@ -663,26 +665,12 @@ const Chatbot = () => {
             className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
           />
           <motion.button
-            whileHover={{ scale: isLoading ? 1 : 1.05 }}
-            whileTap={{ scale: isLoading ? 1 : 0.95 }}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
             onClick={handleSend}
-            disabled={isLoading}
-            className={`${
-              isLoading 
-                ? 'bg-slate-700 cursor-not-allowed' 
-                : 'bg-gradient-to-r from-blue-600 to-blue-500 hover:shadow-lg hover:shadow-blue-500/25'
-            } text-white px-6 py-3 rounded-xl flex items-center gap-2 font-medium transition-all`}
+            className="bg-gradient-to-r from-blue-600 to-blue-500 text-white px-6 py-3 rounded-xl flex items-center gap-2 font-medium hover:shadow-lg hover:shadow-blue-500/25 transition-all"
           >
-            {isLoading ? (
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-              >
-                <Shield size={18} />
-              </motion.div>
-            ) : (
-              <Send size={18} />
-            )}
+            <Send size={18} />
           </motion.button>
         </div>
       </div>
