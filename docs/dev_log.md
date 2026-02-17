@@ -1,5 +1,183 @@
 # Development Log
 
+## 2026-02-17 - Fixed Global Threat Map Background Visibility
+**Timestamp:** 2026-02-17 09:15 UTC  
+**Modified by:** JaiZz (with GitHub Copilot AI Assistant)  
+**Branch:** feat/zero-trust-security-integration  
+**Commit:** Pending
+
+### Problem Identified:
+- Global Threat Map displaying threat markers but map background (world-map.svg) not visible
+- Only colored dots showing on dark background
+- Map image not rendering despite being present in /public folder
+
+### Root Cause Analysis:
+**Next.js Image Component with `fill` Prop Issue:**
+- Image component using `fill` prop requires parent container to have `position: relative`
+- Parent div had `position: absolute` which doesn't work with fill layout
+- Missing `unoptimized` prop for SVG file caused Next.js optimization issues
+
+### Changes Made:
+
+#### 1. Fixed Image Container Positioning (app/page.tsx)
+**Before:**
+```tsx
+<div className="absolute inset-0 flex items-center justify-center">
+  <Image
+    src="/world-map.svg"
+    fill
+    className="object-contain opacity-30 pointer-events-none"
+  />
+</div>
+```
+
+**After:**
+```tsx
+<div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+  <div className="relative w-full h-full">
+    <Image
+      src="/world-map.svg"
+      fill
+      className="object-contain opacity-20"
+      unoptimized
+    />
+  </div>
+</div>
+```
+
+**Key Changes:**
+- ✅ Added nested div with `position: relative` for `fill` prop to work
+- ✅ Set full width/height on relative container
+- ✅ Added `unoptimized` prop for SVG rendering
+- ✅ Adjusted opacity from 30 to 20 for better contrast with threat markers
+- ✅ Moved `pointer-events-none` to outer container
+
+### Files Modified:
+- `app/page.tsx` (+3 lines) - Fixed threat map background rendering
+- `docs/dev_log.md` (+1 entry) - This documentation
+
+### Expected Results:
+- ✅ World map SVG now visible as background
+- ✅ Threat markers display on top of map
+- ✅ Better visual context for geographic threat distribution
+- ✅ Improved dashboard aesthetics
+
+### Technical Notes:
+**Next.js Image `fill` Prop Requirements:**
+1. Parent must have `position: relative`, `absolute`, or `fixed`
+2. Parent should have defined dimensions (width/height)
+3. SVG files should use `unoptimized` prop to prevent conversion issues
+
+**Why This Fix Works:**
+- `fill` makes image take full size of nearest positioned ancestor
+- Nested relative div provides proper positioning context
+- `unoptimized` prevents Next.js from trying to optimize SVG as raster image
+
+### Testing Steps:
+1. Refresh dashboard page
+2. Scroll to "Global Threat Map" section
+3. Verify world map background is visible (light gray continents)
+4. Verify threat markers (colored dots) appear on top of map
+5. Check opacity and contrast are appropriate
+
+---
+
+## 2026-02-17 - Fixed IP Address Logging & Geolocation for Attack Logs
+**Timestamp:** 2026-02-17 09:00 UTC  
+**Modified by:** JaiZz (with GitHub Copilot AI Assistant)  
+**Branch:** feat/zero-trust-security-integration  
+**Commit:** Pending
+
+### Problem Identified:
+- Attack logs in database showing `[object Object]` instead of real IP addresses
+- Geolocation data (city, country, latitude, longitude) showing as NULL in database
+- Dashboard "LIVE ATTACK LOGS" displaying unusable data for threat monitoring
+- Rate limit violations not properly tracked with geographic information
+
+### Root Cause Analysis:
+1. **IP Extraction Issue:** 
+   - Used `decision.ip.toString()` which was converting IP object to string incorrectly
+   - Arcjet decision object may not have proper toString() implementation
+   - Missing proper IP extraction from request headers
+   
+2. **Geolocation Failure:**
+   - API calls timing out or failing silently
+   - No proper handling of localhost/unknown IPs
+   - Missing error fallback mechanisms
+
+### Changes Made:
+
+#### 1. Created IP Extraction Helper Function (middleware.ts)
+**Added `getClientIp()` function:**
+```typescript
+function getClientIp(req: Request): string {
+  // Check x-forwarded-for (Vercel, proxies)
+  // Check x-real-ip (Nginx, other proxies)
+  // Check cf-connecting-ip (Cloudflare)
+  // Fallback to "unknown" if not found
+}
+```
+
+**Benefits:**
+- Properly extracts IP from request headers
+- Supports multiple proxy formats (Vercel, Cloudflare, Nginx)
+- Handles edge cases gracefully
+- Returns actual IP string, not object
+
+#### 2. Updated Rate Limit Logging (middleware.ts)
+**Changes:**
+- Replaced `decision.ip.toString()` with `getClientIp(req)`
+- Added IP validation before geolocation lookup
+- Skip geo for localhost (::1, 127.0.0.1) and unknown IPs
+- Improved code formatting for better readability
+- Added proper timeout handling (3 seconds)
+
+#### 3. Updated General Security Event Logging (middleware.ts)
+**Changes:**
+- Applied same `getClientIp(req)` extraction to bot/shield blocks
+- Consistent IP handling across all security events
+- Better error handling for geolocation failures
+- Maintains fallback chain: ipapi.co → ip-api.com
+
+#### 4. Updated Console Logging (middleware.ts)
+**Changes:**
+- Console warnings now show real IP addresses
+- Better debugging capability for security team
+- Accurate threat tracking in production logs
+
+### Files Modified:
+- `middleware.ts` (+40 lines, refactored logging) - Fixed IP extraction and geolocation
+- `docs/dev_log.md` (+1 entry) - This documentation
+
+### Expected Results:
+- ✅ Real IP addresses logged to database instead of `[object Object]`
+- ✅ Geolocation data properly populated (city, country, coordinates)
+- ✅ Dashboard showing accurate attack origins
+- ✅ Global threat map can display attack locations
+- ✅ Better threat intelligence and monitoring capabilities
+
+### Testing Steps:
+1. Trigger rate limit by refreshing page rapidly
+2. Check database attack_logs table for new entries
+3. Verify IP column shows real IP address
+4. Verify city, country, latitude, longitude are populated
+5. Check dashboard "LIVE ATTACK LOGS" displays correct data
+
+### Technical Notes:
+- Uses Vercel's `x-forwarded-for` header as primary IP source
+- Supports Cloudflare and Nginx proxy headers
+- Geolocation APIs: ipapi.co (primary), ip-api.com (fallback)
+- 3-second timeout prevents slow API calls from blocking requests
+- Localhost IPs skip geolocation to avoid unnecessary API calls
+
+### Next Steps:
+- Test in production environment
+- Monitor geolocation API success rate
+- Consider adding geolocation caching for repeated IPs
+- Implement IP-to-country fallback database for offline geo
+
+---
+
 ## 2026-02-14 - Enhanced AI Chatbot with GPT-Like Intelligence & Security Improvements
 **Timestamp:** 2026-02-14 20:10 UTC  
 **Modified by:** Brix (with GitHub Copilot AI Assistant)  

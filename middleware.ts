@@ -40,6 +40,24 @@ const isProtectedRoute = createRouteMatcher(['/admin', '/resources(.*)', '/proje
 // Define public UI preview routes
 const isPublicUIRoute = createRouteMatcher(['/ui(.*)']);
 
+// Helper function to extract real IP address from request
+function getClientIp(req: Request): string {
+  // Check common IP header sources (Vercel, Cloudflare, etc.)
+  const forwarded = req.headers.get("x-forwarded-for");
+  if (forwarded) {
+    return forwarded.split(",")[0].trim();
+  }
+  const realIp = req.headers.get("x-real-ip");
+  if (realIp) {
+    return realIp.trim();
+  }
+  const cfIp = req.headers.get("cf-connecting-ip");
+  if (cfIp) {
+    return cfIp.trim();
+  }
+  return "unknown";
+}
+
 export default clerkMiddleware(async (auth, req) => {
   // STRICT User-Agent validation - Block all non-browser requests
   const userAgent = req.headers.get("user-agent") || "";
@@ -154,20 +172,42 @@ export default clerkMiddleware(async (auth, req) => {
     // Log rate limit violation to database (don't await - fire and forget)
     (async () => {
       try {
+        // Get the real IP address from request headers
+        const attackIp = getClientIp(req);
+        
         // Geo-lookup with fallback chain (ipapi.co → ip-api.com)
         let geoCity: string | null = null;
         let geoCountry: string | null = null;
         let geoLat: string | null = null;
         let geoLon: string | null = null;
-        const attackIp = decision.ip.toString();
-        try {
-          const r1 = await fetch(`https://ipapi.co/${attackIp}/json/`, { signal: AbortSignal.timeout(3000) });
-          if (r1.ok) { const d = await r1.json(); if (d.latitude && d.longitude) { geoCity = d.city; geoCountry = d.country_name; geoLat = String(d.latitude); geoLon = String(d.longitude); } }
-        } catch {
+        
+        // Skip geolocation for unknown IPs or localhost
+        if (attackIp !== "unknown" && !attackIp.startsWith("::1") && attackIp !== "127.0.0.1") {
           try {
-            const r2 = await fetch(`http://ip-api.com/json/${attackIp}`, { signal: AbortSignal.timeout(3000) });
-            if (r2.ok) { const d = await r2.json(); if (d.status === 'success') { geoCity = d.city; geoCountry = d.country; geoLat = String(d.lat); geoLon = String(d.lon); } }
-          } catch { /* geo unavailable */ }
+            const r1 = await fetch(`https://ipapi.co/${attackIp}/json/`, { signal: AbortSignal.timeout(3000) });
+            if (r1.ok) { 
+              const d = await r1.json(); 
+              if (d.latitude && d.longitude) { 
+                geoCity = d.city; 
+                geoCountry = d.country_name; 
+                geoLat = String(d.latitude); 
+                geoLon = String(d.longitude); 
+              } 
+            }
+          } catch {
+            try {
+              const r2 = await fetch(`http://ip-api.com/json/${attackIp}`, { signal: AbortSignal.timeout(3000) });
+              if (r2.ok) { 
+                const d = await r2.json(); 
+                if (d.status === 'success') { 
+                  geoCity = d.city; 
+                  geoCountry = d.country; 
+                  geoLat = String(d.lat); 
+                  geoLon = String(d.lon); 
+                } 
+              }
+            } catch { /* geo unavailable */ }
+          }
         }
 
         await db.insert(attackLogs).values({
@@ -339,20 +379,42 @@ export default clerkMiddleware(async (auth, req) => {
           severity = 8; // High severity for XSS
         }
         
+        // Get the real IP address from request headers
+        const blockIp = getClientIp(req);
+        
         // Geo-lookup with fallback chain (ipapi.co → ip-api.com)
         let geoCity: string | null = null;
         let geoCountry: string | null = null;
         let geoLat: string | null = null;
         let geoLon: string | null = null;
-        const blockIp = decision.ip.toString();
-        try {
-          const r1 = await fetch(`https://ipapi.co/${blockIp}/json/`, { signal: AbortSignal.timeout(3000) });
-          if (r1.ok) { const d = await r1.json(); if (d.latitude && d.longitude) { geoCity = d.city; geoCountry = d.country_name; geoLat = String(d.latitude); geoLon = String(d.longitude); } }
-        } catch {
+        
+        // Skip geolocation for unknown IPs or localhost
+        if (blockIp !== "unknown" && !blockIp.startsWith("::1") && blockIp !== "127.0.0.1") {
           try {
-            const r2 = await fetch(`http://ip-api.com/json/${blockIp}`, { signal: AbortSignal.timeout(3000) });
-            if (r2.ok) { const d = await r2.json(); if (d.status === 'success') { geoCity = d.city; geoCountry = d.country; geoLat = String(d.lat); geoLon = String(d.lon); } }
-          } catch { /* geo unavailable */ }
+            const r1 = await fetch(`https://ipapi.co/${blockIp}/json/`, { signal: AbortSignal.timeout(3000) });
+            if (r1.ok) { 
+              const d = await r1.json(); 
+              if (d.latitude && d.longitude) { 
+                geoCity = d.city; 
+                geoCountry = d.country_name; 
+                geoLat = String(d.latitude); 
+                geoLon = String(d.longitude); 
+              } 
+            }
+          } catch {
+            try {
+              const r2 = await fetch(`http://ip-api.com/json/${blockIp}`, { signal: AbortSignal.timeout(3000) });
+              if (r2.ok) { 
+                const d = await r2.json(); 
+                if (d.status === 'success') { 
+                  geoCity = d.city; 
+                  geoCountry = d.country; 
+                  geoLat = String(d.lat); 
+                  geoLon = String(d.lon); 
+                } 
+              }
+            } catch { /* geo unavailable */ }
+          }
         }
 
         // Log the attack to the database
@@ -375,7 +437,7 @@ export default clerkMiddleware(async (auth, req) => {
 
     console.warn("Arcjet blocked request:", {
       reason: decision.reason,
-      ip: decision.ip.toString(),
+      ip: getClientIp(req),
       path: req.nextUrl.pathname,
     });
     
