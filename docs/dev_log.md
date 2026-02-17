@@ -1,5 +1,31 @@
 # Development Log
 
+## 2026-02-17 - Fix: Root Page (/) Not Showing Real-Time Dashboard
+**Timestamp:** 2026-02-17 ~12:00 UTC  
+**Modified by:** Sam (with GitHub Copilot AI Assistant)  
+**Branch:** sam-part-2  
+**Commit:** 728f14e
+
+### Problem Identified:
+- Users and teammates visiting `/` (the root route) saw the **old static dashboard** instead of the real-time Recharts dashboard
+- The real dashboard with Recharts charts, SVG world map, and geo-location markers only existed in `app/ui/page.tsx` (route `/ui`)
+- `app/page.tsx` (root `/`) had been overwritten with an older version during PR #36 merge, losing all dashboard improvements
+
+### Root Cause:
+- Two separate page files: `app/page.tsx` (root) and `app/ui/page.tsx` (/ui route)
+- All our dashboard work (Recharts, MAP_PATHS, getRecommendation, geo-location) was in `app/ui/page.tsx`
+- `app/page.tsx` still had: static bar chart, `<Image src="/world-map.svg">`, no Recharts, no MAP_PATHS
+- Everyone visiting `/` saw the old interface; only `/ui` showed the real dashboard
+
+### Fix Applied:
+- Synced `app/page.tsx` with `app/ui/page.tsx` so the root route shows the real-time dashboard
+- Both routes now serve the same dashboard with Recharts graphs, SVG world map, active alerts, and recommendations
+
+### Files Changed:
+- `app/page.tsx` — replaced old static dashboard with real-time Recharts version (393 insertions, 405 deletions)
+
+---
+
 ## 2026-02-14 - Enhanced AI Chatbot with GPT-Like Intelligence & Security Improvements
 **Timestamp:** 2026-02-14 20:10 UTC  
 **Modified by:** Brix (with GitHub Copilot AI Assistant)  
