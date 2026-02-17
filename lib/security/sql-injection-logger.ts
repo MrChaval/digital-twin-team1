@@ -15,9 +15,6 @@ import {
   type SQLInjectionAttempt 
 } from "./sql-injection-detector";
 
-// Re-export types for convenience
-export type { InputSource, SQLInjectionAttempt };
-
 // ============================================================================
 // GEO-LOCATION RESOLVER
 // ============================================================================
@@ -139,7 +136,7 @@ function getRequestMetadata(): {
  */
 export async function logSQLInjectionAttempt(
   inputValue: string,
-  inputSource: InputSource,
+  inputSource: string,
   additionalMetadata?: Record<string, any>
 ): Promise<void> {
   try {
@@ -204,7 +201,7 @@ export async function logSQLInjectionAttempt(
  */
 export async function validateAndLogInput(
   inputValue: string,
-  inputSource: InputSource,
+  inputSource: string,
   additionalMetadata?: Record<string, any>
 ): Promise<{
   isSafe: boolean;
@@ -235,13 +232,13 @@ export async function validateAndLogInput(
 export async function validateMultipleInputs(
   inputs: Array<{
     value: string;
-    source: InputSource;
+    source: string;
   }>,
   additionalMetadata?: Record<string, any>
 ): Promise<{
   allSafe: boolean;
   results: Array<{
-    source: InputSource;
+    source: string;
     isSafe: boolean;
     confidence: number;
     patterns: string[];
@@ -278,7 +275,7 @@ export async function validateMultipleInputs(
  */
 export async function getSQLInjectionStats(): Promise<{
   total: number;
-  bySource: Record<InputSource, number>;
+  bySource: Record<string, number>;
   bySeverity: { critical: number; high: number; medium: number; low: number };
   last24Hours: number;
   last7Days: number;
