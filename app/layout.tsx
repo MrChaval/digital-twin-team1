@@ -37,7 +37,7 @@ export default function RootLayout({
         <AuthSync />
         {/* Client-side security protections */}
         <ClientSecurityProtection />
-        <ThemeProvider attribute="class" defaultTheme="dark" disableTransitionOnChange>
+        <ThemeProvider attribute="class" defaultTheme="cyber">
           <div className="flex min-h-screen flex-col">
             <Navbar />
             <main className="flex-1">{children}</main>

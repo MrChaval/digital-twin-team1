@@ -1,5 +1,115 @@
 # Development Log
 
+## 2026-02-17 - Theme Toggle Improvements & Default Theme Update
+**Timestamp:** 2026-02-17 17:30 UTC  
+**Modified by:** Brix Digap (with GitHub Copilot AI Assistant)  
+**Branch:** fix/attack-logs-display  
+**Commit:** Pending
+
+### Problem Identified:
+- Theme changes required page refresh to apply properly
+- User had to manually select theme every time they visited the site
+- Default theme was Dark instead of the showcased Cyber theme
+
+### Root Cause:
+- `disableTransitionOnChange` prop in ThemeProvider was preventing immediate theme class application
+- Default theme set to "dark" instead of "cyber" in layout.tsx
+
+### Solution Implemented:
+**1. Removed disableTransitionOnChange:**
+- Deleted `disableTransitionOnChange` prop from ThemeProvider
+- Themes now apply instantly without page refresh
+- Added smooth color transitions when switching themes
+- Better user experience with immediate visual feedback
+
+**2. Changed Default Theme to Cyber:**
+- Updated `defaultTheme="dark"` to `defaultTheme="cyber"`
+- New visitors now see the techy blue/cyan theme immediately
+- Showcases the cybersecurity portfolio branding from first impression
+- Aligns with "Digital Twin III: Cyber-Hardened Portfolio" identity
+
+### Changes Made:
+**File: app/layout.tsx**
+```tsx
+// Before:
+<ThemeProvider attribute="class" defaultTheme="dark" disableTransitionOnChange>
+
+// After:
+<ThemeProvider attribute="class" defaultTheme="cyber">
+```
+
+### Technical Benefits:
+- ✅ Instant theme switching (no refresh needed)
+- ✅ Smooth color transitions enhance UX
+- ✅ Default theme showcases unique branding
+- ✅ Theme persistence still works (next-themes localStorage)
+- ✅ All theme options (Light/Dark/Cyber) functional
+
+### User Experience Impact:
+- **Before**: Click theme → No change → Refresh page → Theme applies
+- **After**: Click theme → Instant color change with smooth transition
+- **First Visit**: See Cyber theme immediately instead of generic dark mode
+
+### Files Modified:
+1. `app/layout.tsx` - Removed disableTransitionOnChange, changed default to cyber
+
+### Testing:
+1. Clear browser localStorage to simulate first visit
+2. Visit localhost:3000 → See Cyber theme immediately
+3. Click theme toggle → Select Dark → Instant change
+4. Click theme toggle → Select Light → Instant change
+5. Click theme toggle → Select Cyber → Instant change back
+6. Refresh page → Selected theme persists
+
+---
+
+## 2026-02-17 - Resolved Merge Conflict Between fix/attack-logs-display and main
+**Timestamp:** 2026-02-17 17:00 UTC  
+**Modified by:** Brix Digap (with GitHub Copilot AI Assistant)  
+**Branch:** fix/attack-logs-display  
+**Commit:** ffaca6c
+
+### Context:
+GitHub PR showed merge conflict in `docs/dev_log.md` when attempting to merge fix/attack-logs-display into main. The conflict occurred because both branches had added new development log entries:
+- **fix/attack-logs-display**: Cyber theme implementation, theme system fixes, About page customization
+- **main**: SQL injection logging, bot detection, security features, Vercel build fixes
+
+### Resolution Process:
+1. Fetched latest changes from origin/main
+2. Merged origin/main into fix/attack-logs-display locally
+3. Manually resolved conflict in `docs/dev_log.md` by removing conflict markers
+4. Kept all changes from both branches in chronological order
+5. Staged resolved file and committed merge
+6. Pushed to GitHub to update PR
+
+### Files Affected:
+- **Merged from main**:
+  - `app/actions/chat.ts` - AI chatbot enhancements
+  - `app/actions/newsletter.ts` - SQL injection validation
+  - `app/actions/projects.ts` - Project creation security
+  - `data/blogs.json` - Security blog posts
+  - `docs/SQL_INJECTION_LOGGING_SPEC.md` - Security documentation
+  - `lib/security/sql-injection-detector.ts` - Detection patterns
+  - `lib/security/sql-injection-logger.ts` - Logging system
+  - `scripts/generate-sql-injection-report.js` - Reporting tool
+
+- **Resolved**:
+  - `docs/dev_log.md` - Combined entries from both branches
+
+### Result:
+- ✅ Merge conflict resolved successfully
+- ✅ All changes from both branches preserved
+- ✅ PR now ready to merge on GitHub
+- ✅ Clean working tree (no uncommitted changes)
+
+### Technical Notes:
+- Removed conflict markers: `<<<<<<< HEAD`, `=======`, `>>>>>>> origin/main`
+- Maintained chronological ordering of development log entries
+- Merge commit message documents the resolution
+- Branch now contains all latest features from both fix/attack-logs-display and main
+
+---
+
 ## 2026-02-17 - Cyber Theme with Techy Dark Blue/Cyan Color Scheme
 **Timestamp:** 2026-02-17 16:45 UTC  
 **Modified by:** Brix Digap (with GitHub Copilot AI Assistant)  
