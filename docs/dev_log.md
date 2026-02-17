@@ -1,5 +1,48 @@
 # Development Log
 
+## 2026-02-17 - Additional Vercel Build Fix: Removed Type Exports from Server Actions
+**Timestamp:** 2026-02-17 18:05 UTC  
+**Modified by:** JaiZz (with GitHub Copilot AI Assistant)  
+**Branch:** feat/zero-trust-security-integration  
+**Commit:** 19bf6ce
+
+### Second Build Issue:
+After initial fix, Vercel still failed with new errors:
+```
+Export InputSource doesn't exist in target module
+Export SQLInjectionAttempt doesn't exist in target module
+```
+
+**Root Cause:** Next.js 16 Server Actions files with `'use server'` can ONLY export async functions, not types. The type exports and type references in function signatures were causing the bundler to fail.
+
+### Complete Solution:
+**1. Removed type exports entirely:**
+- Deleted `export type { InputSource, SQLInjectionAttempt }` from sql-injection-logger.ts
+
+**2. Replaced type references with strings in function signatures:**
+- `inputSource: InputSource` → `inputSource: string`
+- `source: InputSource` → `source: string` 
+- `bySource: Record<InputSource, number>` → `bySource: Record<string, number>`
+
+**3. Maintained internal type safety:**
+- Types are still imported from sql-injection-detector.ts for internal use
+- Function parameters are still validated properly
+- InputSource is just a union of string literals anyway
+
+### Functions Updated:
+- `logSQLInjectionAttempt()` - Parameter type changed to string
+- `validateAndLogInput()` - Parameter type changed to string  
+- `validateMultipleInputs()` - Input/return types changed to string
+- `getSQLInjectionStats()` - Return type changed to generic Record<string, number>
+
+### Result: 
+- ✅ No breaking changes to callers (string values work the same)
+- ✅ Server Actions only export async functions (Next.js 16 compliant)
+- ✅ Type safety preserved internally via imports
+- ✅ Build should now succeed on Vercel
+
+---
+
 ## 2026-02-17 - Fixed Vercel Build Error: Server Actions Must Be Async
 **Timestamp:** 2026-02-17 17:45 UTC  
 **Modified by:** JaiZz (with GitHub Copilot AI Assistant)  
