@@ -381,14 +381,17 @@ const Dashboard = () => {
         </div>
         
         {/* World Map Background - Accurate Mercator Projection SVG */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <Image
-            src="/world-map.svg"
-            alt="World Map - Mercator Projection"
-            fill
-            className="object-contain opacity-30 pointer-events-none"
-            priority
-          />
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="relative w-full h-full">
+            <Image
+              src="/world-map.svg"
+              alt="World Map - Mercator Projection"
+              fill
+              className="object-contain opacity-20"
+              priority
+              unoptimized
+            />
+          </div>
         </div>
         
         {/* Threat Markers */}

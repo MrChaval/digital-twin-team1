@@ -59,6 +59,24 @@ const isProtectedRoute = createRouteMatcher(['/admin', '/resources(.*)', '/proje
 // Define public UI preview routes
 const isPublicUIRoute = createRouteMatcher(['/ui(.*)']);
 
+// Helper function to extract real IP address from request
+function getClientIp(req: Request): string {
+  // Check common IP header sources (Vercel, Cloudflare, etc.)
+  const forwarded = req.headers.get("x-forwarded-for");
+  if (forwarded) {
+    return forwarded.split(",")[0].trim();
+  }
+  const realIp = req.headers.get("x-real-ip");
+  if (realIp) {
+    return realIp.trim();
+  }
+  const cfIp = req.headers.get("cf-connecting-ip");
+  if (cfIp) {
+    return cfIp.trim();
+  }
+  return "unknown";
+}
+
 export default clerkMiddleware(async (auth, req) => {
   // STRICT User-Agent validation - Block all non-browser requests
   const userAgent = req.headers.get("user-agent") || "";
@@ -325,6 +343,8 @@ export default clerkMiddleware(async (auth, req) => {
 
   // Log security events for other denials
   if (decision.isDenied()) {
+    // Get real client IP for accurate logging
+    const realIP = getRealClientIP(req);
     // Log SYNCHRONOUSLY (blocking) for real-time dashboard display
     try {
       // Extract meaningful type from decision.reason
