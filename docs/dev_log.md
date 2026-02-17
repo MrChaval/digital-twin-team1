@@ -1,5 +1,98 @@
 # Development Log
 
+## 2026-02-17 - Added Chatbot SQL Injection Logging to Attack Dashboard
+**Timestamp:** 2026-02-17 22:45 UTC  
+**Modified by:** JaiZz (with GitHub Copilot AI Assistant)  
+**Branch:** feat/zero-trust-security-integration  
+**Commit:** Pending
+
+### Purpose:
+Extended SQL injection detection and logging from proxy.ts middleware to chatbot message handler (app/actions/chat.ts), ensuring all SQL injection attempts through the chatbot interface are logged to the attack_logs table with high severity for real-time dashboard monitoring.
+
+### Implementation Details:
+
+#### 1. **Enhanced Chatbot SQL Injection Detection**
+Modified sendChatMessage() in app/actions/chat.ts to detect and categorize SQL injection patterns:
+
+**Attack Type Detection:**
+- `SQL_INJECTION:ADMIN_OR_BYPASS` (Severity 10): admin' OR 1=1, admin' AND 1=1
+- `SQL_INJECTION:DROP_TABLE` (Severity 10): '; DROP TABLE
+- `SQL_INJECTION:UNION_SELECT` (Severity 9): UNION SELECT
+- `SQL_INJECTION:COMMENT_INJECTION` (Severity 8): --, /*, #
+
+**Code Added:**
+```typescript
+// Get IP address from headers
+const headersList = await headers();
+const ip = headersList.get('x-forwarded-for')?.split(',')[0] || 
+           headersList.get('x-real-ip') || 
+           'unknown';
+
+// Determine attack type based on patterns
+let attackType = 'SQL_INJECTION:GENERAL';
+let severity = 9;
+
+if (/admin'?\s*(?:or|and)\s*1\s*=\s*1/i.test(userInput)) {
+  attackType = 'SQL_INJECTION:ADMIN_OR_BYPASS';
+  severity = 10;
+} else if (/';?\s*drop\s+table/i.test(userInput)) {
+  attackType = 'SQL_INJECTION:DROP_TABLE';
+  severity = 10;
+}
+// ... additional patterns
+```
+
+#### 2. **Attack Logging to Database**
+All chatbot SQL injection attempts are logged to attack_logs table:
+
+```typescript
+await db.insert(attackLogs).values({
+  ip,
+  severity,
+  type: attackType,
+  details: `Chatbot SQL injection: ${userInput.substring(0, 100)}`,
+  city: null,
+  country: null,
+  lat: null,
+  long: null,
+  timestamp: new Date(),
+});
+```
+
+#### 3. **Geo-Location Enrichment**
+Background geo-location lookup via ipapi.co:
+- Non-blocking fetch to prevent chatbot response delays
+- Inserts geo-enriched record when successful
+- Silent fail for resilience
+
+#### 4. **Dashboard Integration**
+Chatbot attacks now appear in:
+- **Active Alerts Card**: Real-time high-severity attacks (severity ≥8)
+- **Attack Type Distribution**: Categorized by attack type
+- **Geographic Threat Map**: When geo-location is available
+
+### Security Impact:
+- **Multi-Layer Defense**: Chatbot now has same SQL injection protection as proxy.ts
+- **Unified Monitoring**: All SQL injection attempts visible in single dashboard
+- **Attack Attribution**: Can differentiate between proxy intercepts vs chatbot attempts
+- **Real-Time Alerting**: Critical attacks (severity 10) immediately visible
+
+### Files Modified:
+- `app/actions/chat.ts`: Added attack_logs logging to SQL injection detection block
+  - Imported: `db`, `attackLogs` from '@/lib/db'
+  - Imported: `headers` from 'next/headers'
+  - Enhanced STEP 0: SQL INJECTION DETECTION with database logging
+
+### Testing:
+- Test input: `admin' OR 1=1`
+  - Expected: Blocked response + logged to attack_logs with severity 10
+  - Dashboard should show "SQL_INJECTION:ADMIN_OR_BYPASS" attack
+- Test input: `'; DROP TABLE users`
+  - Expected: Blocked response + logged to attack_logs with severity 10
+  - Dashboard should show "SQL_INJECTION:DROP_TABLE" attack
+
+---
+
 ## 2026-02-17 - Added High-Severity SQL Injection Detection and Dashboard Logging
 **Timestamp:** 2026-02-17 21:10 UTC  
 **Modified by:** JaiZz (with GitHub Copilot AI Assistant)  
