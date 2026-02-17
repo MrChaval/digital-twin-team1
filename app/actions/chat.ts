@@ -544,11 +544,30 @@ export async function sendChatMessage(userInput: string): Promise<ChatResponse> 
     { action: 'chat_message' }
   );
   
-  // If high-confidence SQL injection detected, block immediately
-  if (!sqlValidation.isSafe && sqlValidation.confidence > 0.7) {
+  // Also do direct pattern matching for explicit attacks (bypass confidence threshold)
+  const directPatterns = [
+    { pattern: /admin'?\s*(?:or|and)\s*['"]?1['"]?\s*=\s*['"]?1/i, type: 'SQL_INJECTION:ADMIN_OR_BYPASS', severity: 10 },
+    { pattern: /';?\s*drop\s+table/i, type: 'SQL_INJECTION:DROP_TABLE', severity: 10 },
+    { pattern: /'\s*or\s*['"]?1['"]?\s*=\s*['"]?1/i, type: 'SQL_INJECTION:OR_BYPASS', severity: 9 },
+    { pattern: /union\s+(all\s+)?select/i, type: 'SQL_INJECTION:UNION_SELECT', severity: 9 },
+    { pattern: /';?\s*(delete|update|insert)\s+/i, type: 'SQL_INJECTION:DML_INJECTION', severity: 9 },
+    { pattern: /\/\*.*\*\/|--\s*$|#\s*$/i, type: 'SQL_INJECTION:COMMENT_INJECTION', severity: 8 },
+  ];
+  
+  let directMatch = null;
+  for (const p of directPatterns) {
+    if (p.pattern.test(userInput)) {
+      directMatch = p;
+      break;
+    }
+  }
+  
+  // Block if EITHER: direct pattern match OR high-confidence detection
+  if (directMatch || (!sqlValidation.isSafe && sqlValidation.confidence > 0.3)) {
     console.warn('[CHAT] 🛡️ SQL INJECTION BLOCKED!', {
       confidence: (sqlValidation.confidence * 100).toFixed(1) + '%',
       patterns: sqlValidation.patterns.length,
+      directMatch: directMatch?.type || 'none',
       input: userInput.substring(0, 50) + '...',
     });
     
@@ -558,24 +577,9 @@ export async function sendChatMessage(userInput: string): Promise<ChatResponse> 
                headersList.get('x-real-ip') || 
                'unknown';
     
-    // Determine attack type based on patterns detected
-    let attackType = 'SQL_INJECTION:GENERAL';
-    let severity = 9;
-    
-    const inputLower = userInput.toLowerCase();
-    if (/admin'?\s*(?:or|and)\s*1\s*=\s*1/i.test(userInput)) {
-      attackType = 'SQL_INJECTION:ADMIN_OR_BYPASS';
-      severity = 10;
-    } else if (/';?\s*drop\s+table/i.test(userInput)) {
-      attackType = 'SQL_INJECTION:DROP_TABLE';
-      severity = 10;
-    } else if (/union\s+select/i.test(userInput)) {
-      attackType = 'SQL_INJECTION:UNION_SELECT';
-      severity = 9;
-    } else if (/\/\*.*\*\/|--|\#/i.test(userInput)) {
-      attackType = 'SQL_INJECTION:COMMENT_INJECTION';
-      severity = 8;
-    }
+    // Use direct match if available, otherwise fallback to pattern detection
+    let attackType = directMatch?.type || 'SQL_INJECTION:GENERAL';
+    let severity = directMatch?.severity || 9;
     
     // Log to attack_logs table for dashboard visibility
     try {
@@ -583,11 +587,10 @@ export async function sendChatMessage(userInput: string): Promise<ChatResponse> 
         ip,
         severity,
         type: attackType,
-        details: `Chatbot SQL injection: ${userInput.substring(0, 100)}`,
         city: null,
         country: null,
-        lat: null,
-        long: null,
+        latitude: null,
+        longitude: null,
         timestamp: new Date(),
       });
       
@@ -600,11 +603,10 @@ export async function sendChatMessage(userInput: string): Promise<ChatResponse> 
               ip,
               severity,
               type: attackType,
-              details: `Chatbot SQL injection (geo-enriched): ${userInput.substring(0, 100)}`,
               city: geo.city,
               country: geo.country_name,
-              lat: geo.latitude,
-              long: geo.longitude,
+              latitude: String(geo.latitude),
+              longitude: String(geo.longitude),
               timestamp: new Date(),
             });
           }
