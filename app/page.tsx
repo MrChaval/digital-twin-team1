@@ -341,9 +341,13 @@ const Dashboard = () => {
             >
               <div>
                 <span className={`text-sm font-mono ${log.severity >= 7 ? 'text-red-400' : log.severity >= 4 ? 'text-amber-400' : 'text-slate-400'}`}>
-                  {log.ip === '::1' || log.ip === '127.0.0.1' ? '🏠 localhost' : log.ip}
+                  {log.ip}
                 </span>
-                <p className="text-xs text-slate-500 mt-1">{log.type}</p>
+                <p className="text-xs text-slate-500 mt-1">
+                  {typeof log.type === 'string' && log.type !== '[object Object]' 
+                    ? log.type 
+                    : 'SECURITY_EVENT'}
+                </p>
               </div>
               <div className="text-right">
                 <span className={`text-sm px-2.5 py-1 rounded-full ${log.severity >= 7 ? 'bg-red-500/20 text-red-400' : log.severity >= 4 ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-700 text-slate-400'}`}>
