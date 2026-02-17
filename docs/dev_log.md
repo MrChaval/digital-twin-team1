@@ -1,5 +1,57 @@
 # Development Log
 
+## 2026-02-17 - Fixed Vercel Build Error: Removed Duplicate middleware.ts
+**Timestamp:** 2026-02-17 21:05 UTC  
+**Modified by:** JaiZz (with GitHub Copilot AI Assistant)  
+**Branch:** feat/zero-trust-security-integration  
+**Commit:** Pending
+
+### Issue:
+Vercel deployment failed with error:
+```
+Error: Both middleware file "./middleware.ts" and proxy file "./proxy.ts" are detected. 
+Please use "./proxy.ts" only.
+```
+
+**Root Cause:** Next.js 16 deprecated `middleware.ts` in favor of `proxy.ts`. The repository had both files:
+- `/middleware.ts` (root level - created in recent commit, causing conflict)
+- `/proxy.ts` (root level - the required file for Next.js 16)
+- `/lib/middleware.ts` (subdirectory - not causing conflict)
+
+### Solution:
+**1. Removed conflicting middleware.ts:**
+```bash
+git rm middleware.ts
+```
+
+**2. Updated proxy.ts with rate limiting tier documentation:**
+Added comprehensive comments documenting available rate limiting tiers:
+```typescript
+// 🟢 STANDARD TIER (Current): 50 requests/10 seconds
+// 🔵 HIGH-CAPACITY TIER: 100 requests/10 seconds (2x)
+// 🟡 STRICT TIER: 25 requests/10 seconds (0.5x)
+// Reference: docs/ARCJET_RATE_LIMITING_GUIDE.md
+```
+
+### Files Changed:
+- **DELETED:** `/middleware.ts` (conflicting duplicate)
+- **UPDATED:** `/proxy.ts` (added tier documentation comments)
+- **PRESERVED:** `/lib/middleware.ts` (no conflict - different directory)
+
+### Result:
+- ✅ Vercel build should now succeed (only proxy.ts exists in root)
+- ✅ Rate limiting functionality preserved (proxy.ts has all Arcjet rules)
+- ✅ Tier documentation maintained (comments added to proxy.ts)
+- ✅ No breaking changes to functionality
+
+### Next.js 16 Requirement:
+Next.js 16 requires using `proxy.ts` instead of `middleware.ts` for edge middleware. This change:
+- Aligns with Next.js 16 best practices
+- Maintains all security features (Arcjet Shield, bot detection, rate limiting)
+- Preserves all route protection logic
+
+---
+
 ## 2026-02-17 - Added Arcjet Multi-Tier Rate Limiting Documentation
 **Timestamp:** 2026-02-17 19:30 UTC  
 **Modified by:** JaiZz (with GitHub Copilot AI Assistant)  

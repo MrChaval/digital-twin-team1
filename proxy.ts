@@ -46,6 +46,10 @@ const aj = arcjet({
       ],
     }),
     // Global rate limiting - balanced rate limit per IP
+    // 🟢 STANDARD TIER (Current): 50 requests/10 seconds
+    // Other available tiers (see docs/ARCJET_RATE_LIMITING_GUIDE.md):
+    // 🔵 HIGH-CAPACITY TIER: 100 requests/10 seconds (2x - for API endpoints, authenticated users)
+    // 🟡 STRICT TIER: 25 requests/10 seconds (0.5x - for auth, admin, sensitive operations)
     tokenBucket({
       mode: "LIVE",
       refillRate: 50, // 50 requests per 10 seconds (allows ~7-10 page refreshes)
