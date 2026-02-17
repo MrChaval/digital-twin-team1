@@ -29,6 +29,8 @@ interface Message {
   text: string;
   isUser: boolean;
   timestamp: Date;
+  blocked?: boolean;
+  attackType?: string;
 }
 
 interface AttackLog {
@@ -571,12 +573,13 @@ const Chatbot = () => {
     scrollToBottom();
   }, [messages]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!input.trim()) return;
     
+    const userInput = input;
     const userMsg: Message = {
       id: messages.length + 1,
-      text: input,
+      text: userInput,
       isUser: true,
       timestamp: new Date()
     };
@@ -584,22 +587,31 @@ const Chatbot = () => {
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     
-    setTimeout(() => {
-      const responses = [
-        'I understand your concern. Let me check the security logs for you.',
-        'That\'s a great question about network security. Here\'s what I found...',
-        'I\'ve analyzed the threat pattern. It appears to be a low-risk probe.',
-        'Would you like me to generate a detailed security report?',
-        'Your system is currently protected. No immediate action required.',
-      ];
+    try {
+      // Dynamic import to avoid SSR issues
+      const { sendChatMessage } = await import('@/app/actions/chat');
+      const response = await sendChatMessage(userInput);
+      
       const botMsg: Message = {
         id: messages.length + 2,
-        text: responses[Math.floor(Math.random() * responses.length)],
+        text: response.blocked 
+          ? `🛡️ ATTACK BLOCKED!\n\n${response.message}\n\n⚠️ Reason: ${response.reason}\n\n📊 This attack has been logged to the security dashboard.`
+          : response.message,
+        isUser: false,
+        timestamp: new Date(),
+        blocked: response.blocked,
+        attackType: response.reason,
+      };
+      setMessages(prev => [...prev, botMsg]);
+    } catch (error) {
+      const errorMsg: Message = {
+        id: messages.length + 2,
+        text: 'Sorry, I encountered an error processing your request. Please try again.',
         isUser: false,
         timestamp: new Date()
       };
-      setMessages(prev => [...prev, botMsg]);
-    }, 1000 + Math.random() * 1000);
+      setMessages(prev => [...prev, errorMsg]);
+    }
   };
 
   return (
@@ -642,9 +654,20 @@ const Chatbot = () => {
             transition={{ duration: 0.3 }}
             className={`flex ${msg.isUser ? 'justify-end' : 'justify-start'}`}
           >
-            <div className={`max-w-[70%] ${msg.isUser ? 'bg-gradient-to-r from-blue-600 to-blue-500' : 'bg-slate-800'} rounded-2xl px-4 py-3`}>
-              <p className={`text-sm ${msg.isUser ? 'text-white' : 'text-slate-200'}`}>{msg.text}</p>
-              <p className={`text-[10px] mt-1 ${msg.isUser ? 'text-blue-200' : 'text-slate-500'}`}>
+            <div className={`max-w-[70%] ${msg.isUser 
+              ? 'bg-gradient-to-r from-blue-600 to-blue-500' 
+              : msg.blocked 
+                ? 'bg-gradient-to-r from-red-900/90 to-red-800/90 border border-red-500/50' 
+                : 'bg-slate-800'
+            } rounded-2xl px-4 py-3`}>
+              {msg.blocked && !msg.isUser && (
+                <div className="flex items-center gap-2 mb-2 pb-2 border-b border-red-500/30">
+                  <ShieldAlert className="text-red-400" size={18} />
+                  <span className="text-red-400 font-bold text-xs uppercase tracking-wider">Security Alert</span>
+                </div>
+              )}
+              <p className={`text-sm whitespace-pre-line ${msg.isUser ? 'text-white' : msg.blocked ? 'text-red-100' : 'text-slate-200'}`}>{msg.text}</p>
+              <p className={`text-[10px] mt-1 ${msg.isUser ? 'text-blue-200' : msg.blocked ? 'text-red-300/70' : 'text-slate-500'}`}>
                 {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </p>
             </div>
