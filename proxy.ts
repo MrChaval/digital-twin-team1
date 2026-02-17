@@ -7,6 +7,25 @@ import arcjet, {
   tokenBucket 
 } from "@arcjet/next";
 
+// Helper function to get real client IP (not Vercel proxy IP)
+function getRealClientIP(req: Request): string {
+  // Try x-forwarded-for first (real client IP from Vercel)
+  const forwardedFor = req.headers.get("x-forwarded-for");
+  if (forwardedFor) {
+    // x-forwarded-for can be a comma-separated list, first IP is the real client
+    return forwardedFor.split(',')[0].trim();
+  }
+  
+  // Fallback to x-real-ip
+  const realIp = req.headers.get("x-real-ip");
+  if (realIp) {
+    return realIp;
+  }
+  
+  // Last resort: use Arcjet's detected IP (might be proxy)
+  return "unknown";
+}
+
 // Initialize Arcjet with security rules
 const aj = arcjet({
   key: process.env.ARCJET_KEY!,
@@ -151,38 +170,22 @@ export default clerkMiddleware(async (auth, req) => {
 
   // Check if rate limited - log to database and return HTML error page
   if (decision.isDenied() && decision.reason.isRateLimit()) {
-    // Log rate limit violation to database (don't await - fire and forget)
-    (async () => {
-      try {
-        // Geo-lookup with fallback chain (ipapi.co → ip-api.com)
-        let geoCity: string | null = null;
-        let geoCountry: string | null = null;
-        let geoLat: string | null = null;
-        let geoLon: string | null = null;
-        const attackIp = decision.ip.toString();
-        try {
-          const r1 = await fetch(`https://ipapi.co/${attackIp}/json/`, { signal: AbortSignal.timeout(3000) });
-          if (r1.ok) { const d = await r1.json(); if (d.latitude && d.longitude) { geoCity = d.city; geoCountry = d.country_name; geoLat = String(d.latitude); geoLon = String(d.longitude); } }
-        } catch {
-          try {
-            const r2 = await fetch(`http://ip-api.com/json/${attackIp}`, { signal: AbortSignal.timeout(3000) });
-            if (r2.ok) { const d = await r2.json(); if (d.status === 'success') { geoCity = d.city; geoCountry = d.country; geoLat = String(d.lat); geoLon = String(d.lon); } }
-          } catch { /* geo unavailable */ }
-        }
-
-        await db.insert(attackLogs).values({
-          ip: attackIp,
-          severity: 6, // Rate limit severity
-          type: "RATE_LIMIT",
-          city: geoCity,
-          country: geoCountry,
-          latitude: geoLat,
-          longitude: geoLon,
-        });
-      } catch (err) {
-        console.error("Failed to log rate limit attack:", err);
-      }
-    })();
+    // Get real client IP for accurate logging
+    const realIP = getRealClientIP(req);
+    // Log rate limit violation SYNCHRONOUSLY (blocking) for real-time dashboard
+    try {
+      await db.insert(attackLogs).values({
+        ip: realIP,
+        severity: 6, // Rate limit severity
+        type: "RATE_LIMIT",
+        city: null, // Skip geo for instant logging
+        country: null,
+        latitude: null,
+        longitude: null,
+      });
+    } catch (err) {
+      console.error("Failed to log rate limit attack:", err);
+    }
 
     return new NextResponse(
       `<!DOCTYPE html>
@@ -322,73 +325,51 @@ export default clerkMiddleware(async (auth, req) => {
 
   // Log security events for other denials
   if (decision.isDenied()) {
-    // We want to log the event to our database, but we don't want to block
-    // the response to the user.
-    const logPromise = (async () => {
-      try {
-        // Extract meaningful type from decision.reason
-        let type = 'SECURITY_BLOCK';
-        if (decision.reason.isBot()) {
-          type = 'BOT_DETECTED';
-        } else if (decision.reason.isRateLimit()) {
-          type = 'RATE_LIMIT';
-        } else if (decision.reason.isShield && 'shieldTriggered' in decision.reason) {
-          type = `SHIELD:${decision.reason.shieldTriggered}`;
-        } else if (typeof decision.reason === 'object' && 'type' in decision.reason) {
-          type = String(decision.reason.type);
-        }
-        
-        // Default severity for all blocks is 5, but can be customized
-        let severity = 5;
-        if (decision.reason.isBot()) {
-          severity = 3; // Lower severity for generic bots
-        } else if (decision.reason.isRateLimit()) {
-          severity = 6; // Higher severity for rate limit breaches
-        } else if (type.includes("SQL")) {
-          severity = 9; // High severity for SQL Injection
-        } else if (type.includes("XSS")) {
-          severity = 8; // High severity for XSS
-        }
-        
-        // Geo-lookup with fallback chain (ipapi.co → ip-api.com)
-        let geoCity: string | null = null;
-        let geoCountry: string | null = null;
-        let geoLat: string | null = null;
-        let geoLon: string | null = null;
-        const blockIp = decision.ip.toString();
-        try {
-          const r1 = await fetch(`https://ipapi.co/${blockIp}/json/`, { signal: AbortSignal.timeout(3000) });
-          if (r1.ok) { const d = await r1.json(); if (d.latitude && d.longitude) { geoCity = d.city; geoCountry = d.country_name; geoLat = String(d.latitude); geoLon = String(d.longitude); } }
-        } catch {
-          try {
-            const r2 = await fetch(`http://ip-api.com/json/${blockIp}`, { signal: AbortSignal.timeout(3000) });
-            if (r2.ok) { const d = await r2.json(); if (d.status === 'success') { geoCity = d.city; geoCountry = d.country; geoLat = String(d.lat); geoLon = String(d.lon); } }
-          } catch { /* geo unavailable */ }
-        }
-
-        // Log the attack to the database
-        await db.insert(attackLogs).values({
-          ip: blockIp,
-          severity,
-          type,
-          city: geoCity,
-          country: geoCountry,
-          latitude: geoLat,
-          longitude: geoLon,
-        });
-      } catch (err) {
-        console.error("Failed to log attack to database", err);
+    // Log SYNCHRONOUSLY (blocking) for real-time dashboard display
+    try {
+      // Extract meaningful type from decision.reason
+      let type = 'SECURITY_BLOCK';
+      if (decision.reason.isBot()) {
+        type = 'BOT_DETECTED';
+      } else if (decision.reason.isRateLimit()) {
+        type = 'RATE_LIMIT';
+      } else if (decision.reason.isShield && 'shieldTriggered' in decision.reason) {
+        type = `SHIELD:${decision.reason.shieldTriggered}`;
+      } else if (typeof decision.reason === 'object' && 'type' in decision.reason) {
+        type = String(decision.reason.type);
       }
-    })();
+      
+      // Default severity for all blocks is 5, but can be customized
+      let severity = 5;
+      if (decision.reason.isBot()) {
+        severity = 3; // Lower severity for generic bots
+      } else if (decision.reason.isRateLimit()) {
+        severity = 6; // Higher severity for rate limit breaches
+      } else if (type.includes("SQL")) {
+        severity = 9; // High severity for SQL Injection
+      } else if (type.includes("XSS")) {
+        severity = 8; // High severity for XSS
+      }
+      
+      // Log the attack to the database SYNCHRONOUSLY (blocks response until logged)
+      await db.insert(attackLogs).values({
+        ip: realIP,
+        severity,
+        type,
+        city: null, // Skip geo-lookup for instant logging
+        country: null,
+        latitude: null,
+        longitude: null,
+      });
 
-    // We don't await the promise, but we can catch errors on it
-    logPromise.catch(err => console.error("Error in logging promise:", err));
-
-    console.warn("Arcjet blocked request:", {
-      reason: decision.reason,
-      ip: decision.ip.toString(),
-      path: req.nextUrl.pathname,
-    });
+      console.warn("Arcjet blocked request:", {
+        reason: decision.reason,
+        ip: realIP,
+        path: req.nextUrl.pathname,
+      });
+    } catch (err) {
+      console.error("Failed to log attack to database", err);
+    }
     
     return NextResponse.json(
       { 
