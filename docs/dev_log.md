@@ -1,5 +1,21 @@
 # Development Log
 
+## 2026-02-18 - Extend Threat Activity Chart to 24-Hour Window
+**Timestamp:** 2026-02-18 UTC  
+**Modified by:** GitHub Copilot (per user request)  
+**Branch:** feat/zero-trust-security-integration  
+**Commit:** fe3d84a
+
+### Purpose:
+Extended the X-axis of the "Threat Activity Over Time" chart from ~45-minute window to a full 24-hour window.
+
+### Changes Made:
+- Changed time point generation from 8 points at 7.5-minute intervals to 24 points at 1-hour intervals
+- Updated time label format from `HH:MM` (e.g., `13:15`) to `HH:00` (e.g., `13:00`)
+- Chart now displays hourly data across the last 24 hours for better visibility of daily threat trends
+
+---
+
 ## 2026-02-17 - Fix Build Parse Error (Extra Closing Brace)
 **Timestamp:** 2026-02-17 20:45 UTC  
 **Modified by:** GitHub Copilot (per user request)  
