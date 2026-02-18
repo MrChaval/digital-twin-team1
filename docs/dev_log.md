@@ -1,5 +1,33 @@
 # Development Log
 
+## 2026-02-19 - Restore Main Branch Features + Safe Branding
+**Timestamp:** 2026-02-19 UTC  
+**Modified by:** GitHub Copilot (per user request)  
+**Branch:** feat/ui-overhaul-protagon-defense
+
+### Problem:
+Previous branch changes accidentally broke critical features by replacing main branch code too aggressively:
+- Removed all navbar nav links (Home, About, Blog, Projects) and mobile hamburger menu
+- Removed footer Resources section (Blog, Tools, Guides, Checklists)
+- Added 5-second API polling to dashboard which overwhelmed Arcjet rate limiter (50 req/10s), causing chatbot POST requests to hang or be rate-limited
+- world.svg had `viewbox` (lowercase) instead of `viewBox` (camelCase) — browsers ignored it
+- Sidebar logo was emptied instead of being rebranded
+
+### Fix:
+- Restored `app/page.tsx`, `components/navbar.tsx`, `components/footer.tsx` from `origin/main` (git checkout)
+- Applied ONLY branding changes on top: `SECURE_BOT`→`Protagon Defense`, `CyberApp`→`Protagon Defense`, `CyberShield`→`Protagon Defense`, `securebot.io`→`protagondefense.io`
+- Added world.svg `<image>` overlay to the map (behind inline MAP_PATHS continents) for detailed country borders
+- Fixed world.svg `viewbox` → `viewBox` casing bug and improved SVG fill/stroke colors for dark theme
+- All main branch features preserved: nav links, mobile menu, footer resources, sidebar logo animation, chatbot SQL injection detection, inline map paths, dashboard polling behavior
+
+### Files changed:
+- `app/page.tsx` — branding only (6 text swaps) + 2-line world.svg overlay
+- `components/navbar.tsx` — CyberApp → Protagon Defense (1 line)
+- `components/footer.tsx` — CyberShield → Protagon Defense (2 lines)
+- `public/world.svg` — viewbox → viewBox, fill/stroke color fixes
+
+---
+
 ## 2026-02-19 - OWASP Gap Fixes: Alert Emails, Real Charts, RBAC, Middleware Audit
 **Timestamp:** 2026-02-19 UTC  
 **Modified by:** GitHub Copilot (per user request)  

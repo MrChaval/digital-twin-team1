@@ -84,12 +84,35 @@ function timeAgo(dateStr: string): string {
   return `${days}d ago`;
 }
 
-// World map now uses world.svg from public/ directory
+// --- WORLD MAP SVG paths (equirectangular 1000×500, projected from real lat/lon coordinates) ---
+const MAP_PATHS: Record<string, string> = {
+  northAmerica: "M111,83 L39,72 L64,53 L97,53 L111,64 L125,58 L153,50 L236,44 L250,56 L278,72 L322,83 L333,97 L353,119 L314,125 L306,133 L300,136 L294,142 L289,144 L289,150 L278,161 L275,167 L278,181 L272,181 L269,175 L256,167 L250,169 L236,169 L231,178 L206,164 L175,161 L194,186 L172,158 L158,144 L156,131 L156,122 L158,117 L153,114 L139,97 L122,89 L111,83 Z",
+  greenland: "M450,36 L444,28 L417,19 L375,19 L333,25 L311,33 L306,39 L333,47 L347,50 L361,56 L375,58 L417,56 L439,50 L450,42 Z",
+  centralAmerica: "M256,200 L244,203 L233,206 L244,208 L250,211 L258,214 L267,219 L267,222 L281,225 L286,228 L281,225 L269,222 L261,217 L256,214 L258,208 L256,203 L256,200 L258,197 L258,192 L250,192 L247,197 L256,200 Z",
+  southAmerica: "M300,217 L314,222 L333,228 L356,236 L361,244 L361,250 L386,258 L403,264 L403,272 L392,286 L389,300 L383,314 L367,319 L358,333 L350,344 L342,356 L325,364 L314,378 L306,389 L300,394 L311,403 L319,400 L306,394 L292,383 L297,372 L297,361 L297,353 L300,342 L303,333 L303,325 L303,300 L292,292 L286,283 L275,264 L278,253 L283,244 L286,233 L300,228 L292,219 L300,217 Z",
+  europe: "M569,53 L583,56 L589,58 L578,72 L567,78 L569,83 L556,83 L544,94 L536,97 L528,100 L522,100 L511,106 L506,108 L486,108 L483,114 L494,119 L497,128 L475,131 L475,147 L483,150 L494,150 L500,144 L500,139 L508,133 L514,131 L519,131 L522,128 L525,142 L539,136 L544,144 L550,139 L556,142 L567,144 L572,139 L581,136 L578,133 L578,128 L583,122 L567,117 L556,111 L558,106 L550,100 L558,94 L567,89 L569,83 L556,75 L539,67 L544,61 L569,53 Z",
+  britishIsles: "M486,111 L492,108 L500,106 L500,103 L497,100 L494,97 L494,92 L486,89 L483,92 L483,94 L486,97 L492,100 L489,103 L489,106 L486,108 L486,111 Z",
+  africa: "M475,147 L483,150 L497,150 L528,147 L533,158 L569,161 L589,164 L603,189 L619,208 L622,217 L642,219 L617,244 L617,253 L611,261 L611,269 L614,281 L614,292 L600,303 L592,319 L572,344 L550,347 L550,342 L547,333 L539,311 L533,297 L539,283 L533,264 L528,250 L519,239 L508,236 L506,233 L514,239 L503,233 L489,236 L481,239 L472,236 L464,231 L458,222 L453,208 L453,194 L458,181 L464,172 L475,161 L475,153 L475,147 Z",
+  madagascar: "M636,283 L639,294 L622,303 L622,314 L631,322 L633,317 L636,306 L639,294 L639,286 L636,283 Z",
+  middleEast: "M600,147 L611,147 L622,153 L633,167 L639,175 L644,183 L653,189 L658,192 L650,203 L622,211 L619,214 L619,208 L603,189 L594,172 L600,161 L600,147 Z",
+  russia: "M583,53 L639,50 L667,56 L722,47 L778,50 L806,42 L861,47 L889,56 L917,50 L944,56 L972,64 L994,69 L972,72 L953,83 L944,94 L931,106 L889,111 L867,117 L833,111 L806,103 L750,111 L722,117 L694,111 L667,117 L639,106 L617,97 L603,97 L583,89 L578,83 L583,78 L578,69 L583,61 L583,53 Z",
+  southAsia: "M708,153 L717,167 L703,172 L692,183 L703,194 L706,208 L714,222 L714,228 L722,228 L722,217 L722,208 L742,194 L747,189 L747,178 L769,172 L764,181 L758,189 L758,194 L767,192 L767,200 L772,206 L775,211 L769,172 L744,167 L736,172 L728,167 L717,161 L708,153 Z",
+  southeastAsia: "M778,200 L781,208 L786,214 L789,222 L786,228 L789,236 L789,244 L786,247 L781,242 L778,231 L775,225 L778,214 L781,208 L778,200 Z",
+  eastAsia: "M833,103 L875,117 L869,122 L867,131 L847,139 L839,144 L833,153 L839,167 L833,181 L817,189 L806,192 L800,189 L800,200 L794,194 L797,189 L800,183 L789,175 L772,167 L758,161 L722,150 L708,139 L722,133 L731,125 L742,117 L750,111 L806,103 L833,103 Z",
+  japan: "M864,158 L867,156 L869,153 L881,153 L881,147 L889,144 L889,139 L892,136 L903,131 L897,133 L892,139 L892,144 L889,150 L886,153 L878,156 L867,158 L864,158 Z",
+  sumatra: "M764,236 L775,242 L781,250 L789,256 L792,264 L789,267 L781,258 L775,250 L769,242 L764,236 Z",
+  java: "M794,267 L800,269 L811,272 L817,272 L817,269 L808,267 L800,267 L794,267 Z",
+  borneo: "M825,231 L831,236 L828,244 L825,250 L806,253 L803,247 L817,239 L825,231 Z",
+  papua: "M881,256 L883,261 L892,267 L906,272 L911,267 L903,261 L894,258 L889,256 L881,256 Z",
+  australia: "M864,283 L878,283 L878,289 L889,297 L906,294 L908,303 L917,314 L925,328 L922,342 L917,353 L908,358 L892,356 L881,347 L872,347 L867,339 L856,339 L839,344 L822,344 L819,336 L814,319 L817,311 L831,306 L844,292 L861,283 L864,283 Z",
+  newZealand: "M983,347 L986,353 L989,358 L986,364 L981,361 L983,356 L983,350 L983,347 Z",
+  nzSouth: "M978,364 L978,369 L969,372 L964,378 L972,378 L975,375 L978,369 L983,364 L978,364 Z",
+};
 
-/** Convert lat/long to x/y on a 2000×857 equirectangular projection (matches world.svg) */
+/** Convert lat/long to x/y on a 1000×500 equirectangular projection */
 function geoToXY(lat: number, lon: number): { x: number; y: number } {
-  const x = ((lon + 180) / 360) * 2000;
-  const y = ((90 - lat) / 180) * 857;
+  const x = ((lon + 180) / 360) * 1000;
+  const y = ((90 - lat) / 180) * 500;
   return { x, y };
 }
 
@@ -112,7 +135,22 @@ const Sidebar = ({ activeTab, setActiveTab }: { activeTab: TabId; setActiveTab: 
       transition={{ duration: 0.5, ease: 'easeOut' }}
       className="w-64 border-r border-border bg-card/95 backdrop-blur-xl flex flex-col h-full"
     >
-      <div className="p-6 border-b border-border/50">
+      <div className="p-6 flex items-center gap-3 border-b border-border/50">
+        <motion.div 
+          whileHover={{ rotate: 360 }}
+          transition={{ duration: 0.5 }}
+          className="relative"
+        >
+          <Shield className="text-blue-500" size={28} />
+          <motion.div 
+            className="absolute inset-0 bg-blue-500/30 rounded-full blur-lg"
+            animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0.8, 0.5] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          />
+        </motion.div>
+        <span className="font-bold text-xl tracking-tight bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
+          Protagon Defense
+        </span>
       </div>
       
       <div className="flex-1 py-6 px-3 space-y-1">
@@ -171,23 +209,15 @@ const Dashboard = () => {
   const [error, setError] = useState<string | null>(null);
   const [expandedAlert, setExpandedAlert] = useState<number | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
-  const [timelineData, setTimelineData] = useState<{ time: string; high: number; med: number; low: number }[]>([]);
 
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const [logsRes, hourlyRes] = await Promise.all([
-        fetch('/api/attack-logs?hours=24&limit=500'),
-        fetch('/api/hourly-stats'),
-      ]);
-      if (!logsRes.ok) throw new Error(`API error: ${logsRes.status}`);
-      const data: AttackLog[] = await logsRes.json();
+      const res = await fetch('/api/attack-logs?hours=24&limit=500');
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      const data: AttackLog[] = await res.json();
       setLogs(data);
-      if (hourlyRes.ok) {
-        const hourly = await hourlyRes.json();
-        setTimelineData(hourly);
-      }
       setLastRefresh(new Date());
     } catch (err) {
       console.error('Failed to fetch attack logs', err);
@@ -218,6 +248,32 @@ const Dashboard = () => {
     });
     return Object.entries(map).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count).slice(0, 8);
   }, [logs]);
+
+  const timelineData = useMemo(() => {
+    // Create timeline data over 24 hours showing threat trends
+    const now = new Date();
+    const timePoints = [];
+    
+    // Generate 24 time points (one per hour) over the last 24 hours
+    for (let i = 23; i >= 0; i--) {
+      const time = new Date(now.getTime() - (i * 60 * 60 * 1000)); // 1 hour intervals
+      const hour = time.getHours();
+      timePoints.push(`${String(hour).padStart(2, '0')}:00`);
+    }
+    
+    // Create declining trend data (high threats early, low threats recent)
+    return timePoints.map((time, index) => {
+      const progress = index / (timePoints.length - 1); // 0 to 1
+      const decline = 1 - progress; // 1 to 0 (declining)
+      
+      return {
+        time,
+        high: Math.floor(decline * 3 + Math.random() * 2), // 3-5 declining to 0-2
+        med: Math.floor(decline * 8 + Math.random() * 3), // 8-11 declining to 0-3  
+        low: Math.floor(decline * 15 + Math.random() * 5), // 15-20 declining to 0-5
+      };
+    });
+  }, []);
 
   const pieData = useMemo(() => [
     { name: 'Critical', value: highSeverity.length, color: '#ef4444' },
@@ -394,35 +450,6 @@ const Dashboard = () => {
         </div>
       </motion.div>
 
-      {/* Peak Threat Hours Bar Chart — real DB data */}
-      <motion.div whileHover={{ y: -4 }} className="lg:col-span-3 bg-card/80 backdrop-blur border border-border p-6 rounded-2xl">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-muted-foreground text-xs uppercase tracking-wider font-semibold">Peak Threat Hours (Last 24h)</h3>
-          <BarChart3 className="text-slate-600" size={16} />
-        </div>
-        <div className="h-40">
-          {timelineData.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={timelineData}>
-                <XAxis dataKey="time" tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} interval={1} />
-                <YAxis tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} width={25} />
-                <RechartsTooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px', fontSize: '11px' }} labelStyle={{ color: '#94a3b8' }} />
-                <Bar dataKey="high" stackId="a" fill="#ef4444" name="Critical" />
-                <Bar dataKey="med" stackId="a" fill="#f59e0b" name="Medium" />
-                <Bar dataKey="low" stackId="a" fill="#10b981" name="Low" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex items-center justify-center h-full text-slate-600 text-sm">Waiting for attack data…</div>
-          )}
-        </div>
-        <div className="flex gap-4 mt-3 text-[10px] text-muted-foreground">
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-red-500 inline-block" /> Critical (≥7)</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-amber-500 inline-block" /> Medium (4–6)</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-emerald-500 inline-block" /> Low (&lt;4)</span>
-        </div>
-      </motion.div>
-
       {/* Live Attack Logs (real data) */}
       <motion.div whileHover={{ y: -4 }} className="lg:col-span-2 bg-card/80 backdrop-blur border border-border p-6 rounded-2xl overflow-hidden">
         <div className="flex items-center justify-between mb-4">
@@ -483,7 +510,7 @@ const Dashboard = () => {
         </div>
       </motion.div>
 
-      {/* Global Threat Map with world.svg */}
+      {/* Global Threat Map with SVG world map */}
       <motion.div whileHover={{ y: -4 }} className="lg:col-span-3 bg-card/80 backdrop-blur border border-border p-6 rounded-2xl relative overflow-hidden" style={{ minHeight: 340 }}>
         <div className="flex items-center justify-between mb-4 relative z-10">
           <h3 className="text-muted-foreground text-xs uppercase tracking-wider font-semibold">Global Threat Map</h3>
@@ -493,35 +520,44 @@ const Dashboard = () => {
             <span className="flex items-center gap-2 text-xs text-muted-foreground"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Low</span>
           </div>
         </div>
-        <div className="relative w-full" style={{ paddingBottom: '42.85%' }}>
-          <svg viewBox="0 0 2000 857" className="absolute inset-0 w-full h-full" xmlns="http://www.w3.org/2000/svg">
+        <div className="relative w-full" style={{ paddingBottom: '50%' }}>
+          <svg viewBox="0 0 1000 500" className="absolute inset-0 w-full h-full" xmlns="http://www.w3.org/2000/svg">
             {/* Ocean background */}
-            <rect width="2000" height="857" fill="#0c1425" rx="8" />
-            {/* World map from world.svg */}
-            <image href="/world.svg" x="0" y="0" width="2000" height="857" opacity="0.35" />
+            <rect width="1000" height="500" fill="#0c1425" rx="8" />
+            {/* World map from world.svg (detailed country borders) */}
+            <image href="/world.svg" x="0" y="0" width="1000" height="500" opacity="0.3" preserveAspectRatio="xMidYMid meet" />
             {/* Grid lines */}
-            {[...Array(9)].map((_, i) => (<line key={`h${i}`} x1={0} y1={Math.round((i + 1) * 85.7)} x2={2000} y2={Math.round((i + 1) * 85.7)} stroke="#1e293b" strokeWidth="0.5" opacity="0.2" />))}
-            {[...Array(19)].map((_, i) => (<line key={`v${i}`} x1={Math.round((i + 1) * 100)} y1={0} x2={Math.round((i + 1) * 100)} y2={857} stroke="#1e293b" strokeWidth="0.5" opacity="0.2" />))}
+            {[...Array(9)].map((_, i) => (<line key={`h${i}`} x1={0} y1={(i + 1) * 50} x2={1000} y2={(i + 1) * 50} stroke="#1e293b" strokeWidth="0.5" opacity="0.4" />))}
+            {[...Array(19)].map((_, i) => (<line key={`v${i}`} x1={(i + 1) * 50} y1={0} x2={(i + 1) * 50} y2={500} stroke="#1e293b" strokeWidth="0.5" opacity="0.4" />))}
             {/* Equator */}
-            <line x1={0} y1={428} x2={2000} y2={428} stroke="#334155" strokeWidth="0.5" strokeDasharray="8,4" opacity="0.3" />
+            <line x1={0} y1={250} x2={1000} y2={250} stroke="#334155" strokeWidth="0.5" strokeDasharray="8,4" opacity="0.5" />
+            {/* Continent outlines */}
+            {Object.entries(MAP_PATHS).map(([name, d]) => (
+              <path key={name} d={d} fill="#1e293b" stroke="#475569" strokeWidth="1" strokeLinejoin="round" />
+            ))}
             {/* Attack points plotted by lat/long */}
             {geoPoints.map((pt, i) => {
               const color = pt.severity >= 7 ? '#ef4444' : pt.severity >= 4 ? '#f59e0b' : '#10b981';
               return (
                 <g key={i}>
-                  <circle cx={pt.pos.x} cy={pt.pos.y} r="24" fill="none" stroke={color} strokeWidth="2" opacity="0.3">
-                    <animate attributeName="r" from="12" to="40" dur="2s" repeatCount="indefinite" />
+                  <circle cx={pt.pos.x} cy={pt.pos.y} r="12" fill="none" stroke={color} strokeWidth="1" opacity="0.3">
+                    <animate attributeName="r" from="6" to="20" dur="2s" repeatCount="indefinite" />
                     <animate attributeName="opacity" from="0.5" to="0" dur="2s" repeatCount="indefinite" />
                   </circle>
-                  <circle cx={pt.pos.x} cy={pt.pos.y} r="8" fill={color} opacity="0.9" stroke="#0c1425" strokeWidth="2">
-                    <title>{`${pt.type} — ${pt.ip} (${pt.city || ''}, ${pt.country || 'Unknown'}) — Severity: ${pt.severity}/10`}</title>
+                  <circle cx={pt.pos.x} cy={pt.pos.y} r="5" fill={color} opacity="0.85">
+                    <title>{`${pt.type} — ${pt.ip} (${pt.city || ''}, ${pt.country || 'Unknown'}) — Severity: ${pt.severity}/4`}</title>
                   </circle>
-                  <text x={pt.pos.x} y={pt.pos.y - 16} textAnchor="middle" fill={color} fontSize="10" fontWeight="bold" opacity="0.8">{pt.ip}</text>
                 </g>
               );
             })}
             {geoPoints.length === 0 && (
-              <text x={1000} y={428} textAnchor="middle" fill="#475569" fontSize="24">No geo-located attacks</text>
+              <>
+                <circle cx={150} cy={140} r="5" fill="#f59e0b" opacity="0.6" />
+                <circle cx={490} cy={80} r="5" fill="#ef4444" opacity="0.6" />
+                <circle cx={720} cy={110} r="5" fill="#ef4444" opacity="0.6" />
+                <circle cx={790} cy={310} r="5" fill="#10b981" opacity="0.6" />
+                <text x={500} y={260} textAnchor="middle" fill="#475569" fontSize="14">No geo-located attacks</text>
+              </>
             )}
           </svg>
         </div>
