@@ -40,11 +40,8 @@ This is hands-on cybersecurity that launches careers.
 
 **Team 1** - Building resilient, intelligent, defensible systems.
 
-## All Team Members
+## Team Members
 - Chaval Poolitthinan
-- Sonnam Phuntsho
 - Samuel Christoferi
-- Tanveen Arnob
 - Brix Clarence Digap
-- NIKHIL GAUTAM
 
