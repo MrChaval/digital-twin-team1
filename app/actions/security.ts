@@ -3,6 +3,7 @@
 import { db, attackLogs } from '@/lib/db';
 import { eq } from 'drizzle-orm';
 import { headers } from 'next/headers';
+import { sendAttackAlert } from '@/lib/alert';
 
 /**
  * Log client-side security events to the database
@@ -50,7 +51,12 @@ export async function logClientSecurityEvent(
       longitude: null,
     }).returning({ id: attackLogs.id });
 
-    // 2. Fetch geo in background (don't await - fire and forget)
+    // 2. Send alert email for high/critical severity (fire and forget)
+    if (severity >= 5) {
+      sendAttackAlert({ type: `CLIENT:${type}`, ip, severity, city: null, country: null }).catch(() => {});
+    }
+
+    // 3. Fetch geo in background (don't await - fire and forget)
     if (insertedLog && ip !== "unknown" && !ip.startsWith("127.") && !ip.startsWith("::1")) {
       (async () => {
         try {

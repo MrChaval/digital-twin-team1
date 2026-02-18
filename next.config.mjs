@@ -29,7 +29,7 @@ const nextConfig = {
           // Prevent clickjacking
           {
             key: 'X-Frame-Options',
-            value: 'SAMEORIGIN'
+            value: 'DENY'
           },
           // Prevent MIME-type sniffing
           {

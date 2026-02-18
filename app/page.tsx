@@ -171,15 +171,23 @@ const Dashboard = () => {
   const [error, setError] = useState<string | null>(null);
   const [expandedAlert, setExpandedAlert] = useState<number | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [timelineData, setTimelineData] = useState<{ time: string; high: number; med: number; low: number }[]>([]);
 
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const res = await fetch('/api/attack-logs?hours=24&limit=500');
-      if (!res.ok) throw new Error(`API error: ${res.status}`);
-      const data: AttackLog[] = await res.json();
+      const [logsRes, hourlyRes] = await Promise.all([
+        fetch('/api/attack-logs?hours=24&limit=500'),
+        fetch('/api/hourly-stats'),
+      ]);
+      if (!logsRes.ok) throw new Error(`API error: ${logsRes.status}`);
+      const data: AttackLog[] = await logsRes.json();
       setLogs(data);
+      if (hourlyRes.ok) {
+        const hourly = await hourlyRes.json();
+        setTimelineData(hourly);
+      }
       setLastRefresh(new Date());
     } catch (err) {
       console.error('Failed to fetch attack logs', err);
@@ -210,32 +218,6 @@ const Dashboard = () => {
     });
     return Object.entries(map).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count).slice(0, 8);
   }, [logs]);
-
-  const timelineData = useMemo(() => {
-    // Create timeline data over 24 hours showing threat trends
-    const now = new Date();
-    const timePoints = [];
-    
-    // Generate 24 time points (one per hour) over the last 24 hours
-    for (let i = 23; i >= 0; i--) {
-      const time = new Date(now.getTime() - (i * 60 * 60 * 1000)); // 1 hour intervals
-      const hour = time.getHours();
-      timePoints.push(`${String(hour).padStart(2, '0')}:00`);
-    }
-    
-    // Create declining trend data (high threats early, low threats recent)
-    return timePoints.map((time, index) => {
-      const progress = index / (timePoints.length - 1); // 0 to 1
-      const decline = 1 - progress; // 1 to 0 (declining)
-      
-      return {
-        time,
-        high: Math.floor(decline * 3 + Math.random() * 2), // 3-5 declining to 0-2
-        med: Math.floor(decline * 8 + Math.random() * 3), // 8-11 declining to 0-3  
-        low: Math.floor(decline * 15 + Math.random() * 5), // 15-20 declining to 0-5
-      };
-    });
-  }, []);
 
   const pieData = useMemo(() => [
     { name: 'Critical', value: highSeverity.length, color: '#ef4444' },
@@ -409,6 +391,35 @@ const Dashboard = () => {
           <div className="space-y-1">
             {pieData.map(p => (<div key={p.name} className="flex items-center gap-2 text-[10px]"><span className="w-2 h-2 rounded-full" style={{ background: p.color }} /><span className="text-muted-foreground">{p.name}: {p.value}</span></div>))}
           </div>
+        </div>
+      </motion.div>
+
+      {/* Peak Threat Hours Bar Chart — real DB data */}
+      <motion.div whileHover={{ y: -4 }} className="lg:col-span-3 bg-card/80 backdrop-blur border border-border p-6 rounded-2xl">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-muted-foreground text-xs uppercase tracking-wider font-semibold">Peak Threat Hours (Last 24h)</h3>
+          <BarChart3 className="text-slate-600" size={16} />
+        </div>
+        <div className="h-40">
+          {timelineData.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={timelineData}>
+                <XAxis dataKey="time" tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} interval={1} />
+                <YAxis tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} width={25} />
+                <RechartsTooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px', fontSize: '11px' }} labelStyle={{ color: '#94a3b8' }} />
+                <Bar dataKey="high" stackId="a" fill="#ef4444" name="Critical" />
+                <Bar dataKey="med" stackId="a" fill="#f59e0b" name="Medium" />
+                <Bar dataKey="low" stackId="a" fill="#10b981" name="Low" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-full text-slate-600 text-sm">Waiting for attack data…</div>
+          )}
+        </div>
+        <div className="flex gap-4 mt-3 text-[10px] text-muted-foreground">
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-red-500 inline-block" /> Critical (≥7)</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-amber-500 inline-block" /> Medium (4–6)</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-emerald-500 inline-block" /> Low (&lt;4)</span>
         </div>
       </motion.div>
 
