@@ -149,7 +149,7 @@ const Sidebar = ({ activeTab, setActiveTab }: { activeTab: TabId; setActiveTab: 
           />
         </motion.div>
         <span className="font-bold text-xl tracking-tight bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
-          SECURE_BOT
+          Protagon Defense
         </span>
       </div>
       
@@ -571,7 +571,7 @@ const Dashboard = () => {
 // 3. CHATBOT COMPONENT
 const Chatbot = () => {
   const [messages, setMessages] = useState<Message[]>([
-    { id: 1, text: 'Hello! I am SECURE_BOT, your security assistant. How can I help you today?', isUser: false, timestamp: new Date(), isBlocked: false }
+    { id: 1, text: 'Hello! I am Protagon Defense, your security assistant. How can I help you today?', isUser: false, timestamp: new Date(), isBlocked: false }
   ]);
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -670,7 +670,7 @@ const Chatbot = () => {
           />
         </div>
         <div>
-          <h3 className="font-semibold text-foreground">SECURE_BOT</h3>
+          <h3 className="font-semibold text-foreground">Protagon Defense</h3>
           <p className="text-xs text-emerald-400 flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Online
           </p>
@@ -918,7 +918,7 @@ const AboutUs = () => {
         >
           <Shield className="text-blue-500" size={48} />
         </motion.div>
-        <h2 className="text-4xl font-bold text-foreground mb-4">About SECURE_BOT</h2>
+        <h2 className="text-4xl font-bold text-foreground mb-4">About Protagon Defense</h2>
         <p className="text-muted-foreground max-w-2xl mx-auto leading-relaxed">
           We are a team of cybersecurity experts dedicated to protecting businesses from evolving digital threats. 
           Our AI-powered platform provides real-time threat detection and automated response capabilities.
@@ -993,9 +993,9 @@ const Contact = () => {
   };
 
   const contactMethods = [
-    { icon: Mail, label: 'Email', value: 'support@securebot.io', color: 'blue' },
+    { icon: Mail, label: 'Email', value: 'support@protagondefense.io', color: 'blue' },
     { icon: Phone, label: 'Phone', value: '+1 (555) 123-4567', color: 'emerald' },
-    { icon: Globe, label: 'Website', value: 'www.securebot.io', color: 'cyan' },
+    { icon: Globe, label: 'Website', value: 'www.protagondefense.io', color: 'cyan' },
   ];
 
   return (
