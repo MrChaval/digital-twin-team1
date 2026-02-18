@@ -1,5 +1,24 @@
 # Development Log
 
+## 2026-02-18 - Remove Duplicate Logo & Integrate world.svg Threat Map
+**Timestamp:** 2026-02-18 UTC  
+**Modified by:** GitHub Copilot (per user request)  
+**Branch:** feat/ui-overhaul-protagon-defense  
+**Commit:** e10d257
+
+### Changes Made:
+- **Removed duplicate Protagon Defense logo** from the sidebar (kept the one in navbar aligned with signup button)
+- **Replaced hardcoded MAP_PATHS** (continent outlines) with actual `world.svg` map from Simplemaps (MIT license)
+- **Updated `geoToXY` projection** from 1000×500 to 2000×857 to match world.svg viewBox
+- **Enhanced threat map visualization**: larger attack dots (r=8), animated pulse rings (r=24), IP address labels displayed above each dot
+- **Copied `world.svg`** to `public/` for static serving
+
+### Files Modified:
+- `app/page.tsx` — sidebar logo removal, MAP_PATHS replacement, threat map SVG overhaul
+- `public/world.svg` — new file (976 lines, equirectangular world map)
+
+---
+
 ## 2026-02-18 - Extend Threat Activity Chart to 24-Hour Window
 **Timestamp:** 2026-02-18 UTC  
 **Modified by:** GitHub Copilot (per user request)  
