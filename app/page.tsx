@@ -250,16 +250,15 @@ const Dashboard = () => {
   }, [logs]);
 
   const timelineData = useMemo(() => {
-    // Create synthetic timeline data that shows declining threat trend (like photo 1)
+    // Create timeline data over 24 hours showing threat trends
     const now = new Date();
     const timePoints = [];
     
-    // Generate 8 time points over the last hour
-    for (let i = 7; i >= 0; i--) {
-      const time = new Date(now.getTime() - (i * 7.5 * 60 * 1000)); // 7.5 min intervals
+    // Generate 24 time points (one per hour) over the last 24 hours
+    for (let i = 23; i >= 0; i--) {
+      const time = new Date(now.getTime() - (i * 60 * 60 * 1000)); // 1 hour intervals
       const hour = time.getHours();
-      const minute = Math.floor(time.getMinutes() / 15) * 15; // Round to 15min intervals
-      timePoints.push(`${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`);
+      timePoints.push(`${String(hour).padStart(2, '0')}:00`);
     }
     
     // Create declining trend data (high threats early, low threats recent)
