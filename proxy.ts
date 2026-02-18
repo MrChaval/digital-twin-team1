@@ -8,6 +8,7 @@ import arcjet, {
   shield,
   tokenBucket 
 } from "@arcjet/next";
+import { sendAttackAlert } from "./lib/alert";
 
 // Helper function to get real client IP (not Vercel proxy IP)
 function getRealClientIP(req: Request): string {
@@ -261,6 +262,8 @@ export default clerkMiddleware(async (auth, req) => {
     }
 
     // Block the request immediately
+    // Fire alert email for SQL injection (fire-and-forget)
+    sendAttackAlert({ type: attackType, ip: realIP, severity: attackSeverity }).catch(() => {});
     return NextResponse.json(
       {
         error: "Forbidden",

@@ -1,5 +1,21 @@
 # Development Log
 
+## 2026-02-19 - OWASP Gap Fixes: Alert Emails, Real Charts, RBAC, Middleware Audit
+**Timestamp:** 2026-02-19 UTC  
+**Modified by:** GitHub Copilot (per user request)  
+**Branch:** feat/ui-overhaul-protagon-defense
+
+### Changes:
+- **Alert emails (A09):** Installed `resend` package, created `lib/alert.ts` email helper. Alert emails fire for severity ≥ 5 events in `app/actions/security.ts` and for SQL injection blocks in `proxy.ts`
+- **Real hourly chart (A09):** Created `/api/hourly-stats` route querying `attack_logs` grouped by hour. Dashboard "Threat Activity" chart now uses real DB data instead of synthetic random numbers
+- **Peak Threat Hours bar chart (A09):** Added stacked bar chart showing attacks by hour-of-day from real data
+- **RBAC bug fix (A01):** Fixed `app/admin/page.tsx` — was checking `isAdmin` (function reference) instead of `await isAdmin()`, making admin page unprotected
+- **X-Frame-Options (A05):** Unified to `DENY` in `next.config.mjs` (was `SAMEORIGIN`)
+- **Middleware audit:** Discovered `lib/middleware.ts` was dead code — `proxy.ts` is the active Next.js 16 middleware with full Arcjet + Clerk integration. Removed conflicting `middleware.ts` file created in error
+- **OWASP mapping doc:** Created `docs/owasp-mapping.md` — 8/10 satisfied, 2 partial (A06: pnpm audit CI, A08: signed commits)
+
+---
+
 ## 2026-02-18 - Remove Duplicate Logo & Integrate world.svg Threat Map
 **Timestamp:** 2026-02-18 UTC  
 **Modified by:** GitHub Copilot (per user request)  
